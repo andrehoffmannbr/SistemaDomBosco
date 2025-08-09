@@ -1,5 +1,6 @@
 // Stock management module
-import { db, saveDb } from './database.js';
+import { supabase, getUser } from '../lib/supabaseClient.js';
+import { hydrate, saveDatabase } from './database.js';
 import { getCurrentUser, isRoleAllowed, DIRECTOR_ONLY, STOCK_MANAGERS } from './auth.js';
 
 export function renderStockList() {
@@ -327,14 +328,15 @@ export function updateStockSummary() {
     }
 }
 
-export function adjustStock(itemId, action) {
+export async function adjustStock(itemId, action) {
     // Only Director and Finance can adjust stock
     if (!isRoleAllowed(STOCK_MANAGERS)) { 
         showNotification('Você não tem permissão para ajustar o estoque.', 'error'); 
         return; 
     }
 
-    const item = db.stockItems.find(item => item.id === itemId);
+    const { data: stockItems } = await supabase.from('stock_items').select('*');
+    const item = stockItems.find(item => item.id === itemId);
     if (!item) return;
     
     // Store the current adjustment data globally
@@ -366,6 +368,57 @@ export function adjustStock(itemId, action) {
     // Reset form and show modal
     document.getElementById('form-adjust-stock').reset();
     modal.style.display = 'flex';
+}
+
+// NEW: Update stock function
+export async function updateStock(itemId, quantity, reason, action = 'adjustment') {
+    if (!isRoleAllowed(STOCK_MANAGERS)) {
+        showNotification('Você não tem permissão para atualizar o estoque.', 'error');
+        return;
+    }
+
+    try {
+        const { data: stockItem } = await supabase.from('stock_items').select('*').eq('id', itemId).single();
+        if (!stockItem) throw new Error('Item não encontrado');
+
+        let newQuantity;
+        if (action === 'add') {
+            newQuantity = stockItem.quantity + quantity;
+        } else if (action === 'remove') {
+            newQuantity = Math.max(0, stockItem.quantity - quantity);
+        } else {
+            newQuantity = quantity; // Direct set
+        }
+
+        const { error: updateError } = await supabase
+            .from('stock_items')
+            .update({ quantity: newQuantity })
+            .eq('id', itemId);
+
+        if (updateError) throw updateError;
+
+        // Add movement record
+        const { error: movementError } = await supabase.from('stock_movements').insert([{
+            item_id: itemId,
+            item_name: stockItem.name,
+            type: action === 'add' ? 'entrada' : 'saida',
+            quantity: quantity,
+            reason: reason,
+            user_id: (await getUser()).id,
+            item_unit_value: stockItem.unit_value
+        }]);
+
+        if (movementError) throw movementError;
+
+        await hydrate('stock_items');
+        await hydrate('stock_movements');
+
+        showNotification('Estoque atualizado com sucesso!', 'success');
+        return newQuantity;
+    } catch (error) {
+        showNotification('Erro ao atualizar estoque: ' + error.message, 'error');
+        throw error;
+    }
 }
 
 export function showDeleteStockItemConfirmation(itemId) {

@@ -1,5 +1,6 @@
 // Schedule management module
-import { db, saveDb } from './database.js';
+import { supabase, getUser } from '../lib/supabaseClient.js';
+import { hydrate, saveDatabase } from './database.js';
 import { getCurrentUser, isRoleAllowed, PROFESSIONAL_ROLES, COORDINATOR_AND_HIGHER, ALL_SCHEDULE_VIEW_EDIT_MANAGERS, checkTabAccess } from './auth.js'; // Import constants
 import { showNotification } from './ui.js';
 import { showClientDetails } from './clients.js'; // Import showClientDetails to re-render client modal
@@ -275,8 +276,9 @@ export function renderSchedule(selectedDate = null) {
     });
 }
 
-export function updateScheduleStatus(scheduleId, newStatus) {
-    const schedule = db.schedules.find(s => s.id === scheduleId);
+export async function updateScheduleStatus(scheduleId, newStatus) {
+    const { data: schedules } = await supabase.from('schedules').select('*');
+    const schedule = schedules.find(s => s.id === scheduleId);
     if (schedule) {
         const currentUser = getCurrentUser();
 
@@ -284,7 +286,7 @@ export function updateScheduleStatus(scheduleId, newStatus) {
         // A user can confirm if they have 'edit' access to 'agenda' tab
         // OR if they have 'view' access and the schedule is assigned to them.
         const canConfirm = checkTabAccess('agenda', 'edit') ||
-                           (checkTabAccess('agenda', 'view') && schedule.assignedToUserId === currentUser.id);
+                           (checkTabAccess('agenda', 'view') && schedule.assigned_to === currentUser.id);
 
         if (newStatus === 'confirmado') {
             if (!canConfirm) {
@@ -293,7 +295,8 @@ export function updateScheduleStatus(scheduleId, newStatus) {
             }
 
             window.currentConfirmingScheduleId = scheduleId;
-            const client = db.clients.find(c => c.id === schedule.clientId);
+            const { data: clients } = await supabase.from('clients').select('*');
+            const client = clients.find(c => c.id === schedule.client_id);
             
             // Pre-fill professional responsible field, preferring assigned user
             const profissionalResponsavelInput = document.getElementById('profissional-responsavel');
@@ -305,7 +308,7 @@ export function updateScheduleStatus(scheduleId, newStatus) {
             // If user has edit access to agenda, they can select any professional.
             // Otherwise, if they only have view access and it's their own schedule, they can only set themselves.
             if (checkTabAccess('agenda', 'edit')) {
-                profissionalResponsavelInput.value = schedule.assignedToUserName || currentUser.name;
+                profissionalResponsavelInput.value = schedule.assigned_to_name || currentUser.name;
                 profissionalResponsavelInput.readOnly = false;
             } else if (checkTabAccess('agenda', 'view') && schedule.assignedToUserId === currentUser.id) {
                 profissionalResponsavelInput.value = currentUser.name;
@@ -360,8 +363,9 @@ export function cancelScheduleWithReason(scheduleId) {
     document.getElementById('modal-cancelar-agendamento').style.display = 'flex';
 }
 
-export function editSchedule(scheduleId) {
-    const schedule = db.schedules.find(s => s.id === scheduleId);
+export async function editSchedule(scheduleId) {
+    const { data: schedules } = await supabase.from('schedules').select('*');
+    const schedule = schedules.find(s => s.id === scheduleId);
     if (!schedule) return;
     
     // Only users with 'edit' permission for the 'agenda' tab can edit schedules.
@@ -376,10 +380,10 @@ export function editSchedule(scheduleId) {
     populateEditClientSelectOptions();
     populateEditServiceTypeOptions();
     
-    document.getElementById('edit-cliente-agenda').value = schedule.clientId;
+    document.getElementById('edit-cliente-agenda').value = schedule.client_id;
     document.getElementById('edit-data-agendamento').value = schedule.date;
     document.getElementById('edit-hora-agendamento').value = schedule.time;
-    document.getElementById('edit-tipo-servico').value = schedule.serviceType;
+    document.getElementById('edit-tipo-servico').value = schedule.service_type;
     document.getElementById('edit-observacoes-agendamento').value = schedule.observations || '';
     
     document.getElementById('modal-editar-agendamento').style.display = 'flex';
@@ -414,8 +418,9 @@ function populateEditServiceTypeOptions() {
     });
 }
 
-export function saveEditedSchedule() {
-    const schedule = db.schedules.find(s => s.id === window.currentEditingScheduleId);
+export async function saveEditedSchedule() {
+    const { data: schedules } = await supabase.from('schedules').select('*');
+    const schedule = schedules.find(s => s.id === window.currentEditingScheduleId);
     if (!schedule) return;
     
     const clientId = parseInt(document.getElementById('edit-cliente-agenda').value);
@@ -429,13 +434,19 @@ export function saveEditedSchedule() {
         return;
     }
 
-    schedule.clientId = clientId;
-    schedule.date = date;
-    schedule.time = time;
-    schedule.serviceType = serviceType;
-    schedule.observations = observations;
+    const { error } = await supabase
+        .from('schedules')
+        .update({
+            client_id: clientId,
+            date: date,
+            time: time,
+            service_type: serviceType,
+            observations: observations
+        })
+        .eq('id', window.currentEditingScheduleId);
 
-    saveDb();
+    if (error) throw error;
+    await hydrate('schedules');
     
     document.getElementById('modal-editar-agendamento').style.display = 'none';
     renderSchedule(document.getElementById('date-selector').value);
@@ -709,8 +720,181 @@ export function populateAssignableUsers() {
         select.disabled = true; // Disable the select box
     } else {
         // Other roles (e.g., financeiro, staff not in PROFESSIONAL_ROLES) or no access to agenda
-        select.innerHTML = '<option value="">Nenhum</option>';
+        select.innerHTML = '<option value="">Nenhum profissional disponível</option>';
         select.disabled = true;
+    }
+}
+
+// NEW: Confirm attendance function
+export async function confirmAttendance(scheduleId, attendanceData) {
+    if (!checkTabAccess('agenda', 'edit')) {
+        showNotification('Você não tem permissão para confirmar atendimentos.', 'error');
+        return;
+    }
+
+    try {
+        const { error } = await supabase
+            .from('schedules')
+            .update({
+                status: 'confirmado',
+                attendance_notes: attendanceData.notes || '',
+                professional_responsible: attendanceData.professional || '',
+                confirmed_by: (await getUser()).id,
+                confirmed_at: new Date().toISOString()
+            })
+            .eq('id', scheduleId);
+
+        if (error) throw error;
+        await hydrate('schedules');
+
+        showNotification('Atendimento confirmado com sucesso!', 'success');
+        return true;
+    } catch (error) {
+        showNotification('Erro ao confirmar atendimento: ' + error.message, 'error');
+        throw error;
+    }
+}
+
+// =====================================================
+// MAIN CRUD FUNCTIONS (B4 Migration)
+// =====================================================
+
+// NEW: Add schedule function (corrigida para schema)
+export async function addSchedule(scheduleData) {
+    if (!checkTabAccess('agenda', 'add')) {
+        showNotification('Você não tem permissão para criar agendamentos.', 'error');
+        return;
+    }
+    try {
+        const { id: uid } = await getUser();
+
+        const payload = {
+            client_id: scheduleData.clientId ?? scheduleData.client_id,
+            date: scheduleData.date,                 // 'YYYY-MM-DD'
+            time: scheduleData.time,                 // 'HH:MM'
+            service_type: scheduleData.serviceType ?? scheduleData.service_type,
+            observations: scheduleData.observations ?? null,
+            status: scheduleData.status ?? 'agendado',
+            assigned_to_user_uid: scheduleData.assignedToUserId ?? scheduleData.assigned_to_user_uid ?? null,
+            assigned_to_user_name: scheduleData.assignedToUserName ?? scheduleData.assigned_to_user_name ?? null,
+            user_id: uid
+        };
+
+        const { data, error } = await supabase.from('schedules').insert(payload).select().single();
+        if (error) throw error;
+
+        await hydrate('schedules');
+        showNotification('Agendamento criado com sucesso!', 'success');
+        return data;
+    } catch (error) {
+        showNotification('Erro ao criar agendamento: ' + error.message, 'error');
+        throw error;
+    }
+}
+
+// NEW: Edit schedule function (corrigida para schema)
+export async function editSchedule(scheduleId, patchData) {
+    if (!checkTabAccess('agenda', 'edit')) {
+        showNotification('Você não tem permissão para editar agendamentos.', 'error');
+        return;
+    }
+    try {
+        const updateData = {
+            client_id: patchData.clientId ?? patchData.client_id,
+            date: patchData.date ?? null,
+            time: patchData.time ?? null,
+            service_type: patchData.serviceType ?? patchData.service_type,
+            observations: patchData.observations ?? null,
+            status: patchData.status // se quiser permitir alterar status aqui
+        };
+
+        // remove undefined to avoid overwriting unintentionally
+        Object.keys(updateData).forEach(k => updateData[k] === undefined && delete updateData[k]);
+
+        const { data, error } = await supabase
+            .from('schedules')
+            .update(updateData)
+            .eq('id', scheduleId)
+            .select()
+            .single();
+        if (error) throw error;
+
+        await hydrate('schedules');
+        showNotification('Agendamento atualizado com sucesso!', 'success');
+        return data;
+    } catch (error) {
+        showNotification('Erro ao editar agendamento: ' + error.message, 'error');
+        throw error;
+    }
+}
+
+// NEW: Delete schedule function (ok)
+export async function deleteSchedule(scheduleId) {
+    if (!checkTabAccess('agenda', 'edit')) {
+        showNotification('Você não tem permissão para excluir agendamentos.', 'error');
+        return;
+    }
+    try {
+        const { error } = await supabase.from('schedules').delete().eq('id', scheduleId);
+        if (error) throw error;
+
+        await hydrate('schedules');
+        showNotification('Agendamento excluído com sucesso!', 'success');
+        return true;
+    } catch (error) {
+        showNotification('Erro ao excluir agendamento: ' + error.message, 'error');
+        throw error;
+    }
+}
+
+// NEW: Confirm attendance function (corrigida para schema)
+export async function confirmAttendance(attendanceData) {
+    if (!checkTabAccess('agenda', 'edit')) {
+        showNotification('Você não tem permissão para confirmar atendimentos.', 'error');
+        return;
+    }
+    try {
+        const { id: uid } = await getUser();
+
+        // 1) cria appointment com campos do schema
+        const appointmentPayload = {
+            client_id: attendanceData.clientId ?? attendanceData.client_id,
+            date: attendanceData.date,                 // use a mesma data do schedule
+            time: attendanceData.time,                 // idem
+            service_type: attendanceData.serviceType ?? attendanceData.service_type,
+            notes: attendanceData.attendanceNotes ?? '',   // mapeando suas notas -> notes
+            attended_by: attendanceData.professionalResponsible ?? null, // opcional
+            materials_used: attendanceData.materials ?? [], // jsonb array
+            attachments: attendanceData.attachments ?? [],   // jsonb array
+            user_id: uid
+        };
+
+        const { data: appointment, error: e1 } = await supabase
+            .from('appointments')
+            .insert(appointmentPayload)
+            .select()
+            .single();
+        if (e1) throw e1;
+
+        // 2) marca agenda como concluída e vincula attendance_id
+        const { error: e2 } = await supabase
+            .from('schedules')
+            .update({
+                status: 'concluido',
+                confirmed_at: new Date().toISOString(),
+                attendance_id: appointment.id
+            })
+            .eq('id', attendanceData.scheduleId ?? attendanceData.id);
+        if (e2) throw e2;
+
+        await hydrate('schedules');
+        await hydrate('appointments');
+
+        showNotification('Atendimento confirmado com sucesso!', 'success');
+        return appointment;
+    } catch (error) {
+        showNotification('Erro ao confirmar atendimento: ' + error.message, 'error');
+        throw error;
     }
 }
 

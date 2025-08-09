@@ -79,7 +79,7 @@ async function handleCepInputMinor(e) {
 }
 
 function setupClientForms() {
-    document.getElementById('form-novo-cliente-adulto').addEventListener('submit', (e) => {
+    document.getElementById('form-novo-cliente-adulto').addEventListener('submit', async (e) => {
         e.preventDefault();
         
         try {
@@ -137,10 +137,8 @@ function setupClientForms() {
                 return;
             }
             
-            db.clients.push(newClient);
-            saveDb();
+            await addClient(newClient);
             e.target.reset();
-            showNotification(`Cliente "${newClient.name}" cadastrado com sucesso!`, 'success');
             renderClientList();
             switchTab('historico');
             updateGlobalSearchDatalist();
@@ -150,7 +148,7 @@ function setupClientForms() {
         }
     });
 
-    document.getElementById('form-novo-cliente-menor').addEventListener('submit', (e) => {
+    document.getElementById('form-novo-cliente-menor').addEventListener('submit', async (e) => {
         e.preventDefault();
         
         try {
@@ -204,8 +202,8 @@ function setupClientForms() {
                 return;
             }
             
-            db.clients.push(newClient);
-            saveDb();
+            // [B4] Replace db.clients.push with Supabase function call
+            await addClient(newClient);
             e.target.reset();
             showNotification(`Cliente "${newClient.name}" cadastrado com sucesso!`, 'success');
             renderClientList();

@@ -1,9 +1,10 @@
 // Main application entry point
-import { loadDb, saveDb, db } from './database.js';
+import { supabase, getUser } from '../lib/supabaseClient.js';
+import { hydrateAll, hydrate, saveDatabase } from './database.js';
 import { login, logout, checkLogin, getCurrentUser, isRoleAllowed, DIRECTOR_ONLY, FINANCE_ONLY, DIRECTOR_OR_FINANCE, STOCK_MANAGERS, ALL_USERS, PROFESSIONAL_ROLES, COORDINATOR_AND_HIGHER, NON_FINANCE_ACCESS, ALL_ADMIN_VIEW_CLIENTS_AND_EMPLOYEES, DIRECTOR_AND_PROFESSIONALS, DIRECTOR_AND_COORDINATORS_ONLY_DOCUMENTS, checkTabAccess } from './auth.js'; 
 import { showLoginScreen, showMainApp, switchTab, updateCurrentDate, showNotification, updateGlobalSearchDatalist } from './ui.js'; 
 import { renderClientList, showClientDetails, addClientNote, addClientDocument, deleteClientDocument, renderMeusPacientes, renderClientReport, showAssignProfessionalModal, assignProfessionalToClient, unassignProfessionalFromClient, deleteClient, duplicateClient, showEmployeeReport, showClientReportModal, generateClientReport } from './clients.js'; 
-import { renderSchedule, updateScheduleStatus, initializeCalendar, renderCalendar, saveEditedSchedule, cancelScheduleWithReason, reassignSchedule, populateAssignableUsers, serviceNames, editSchedule, saveReassignedSchedule, initScheduleView } from './schedule.js'; 
+import { renderSchedule, updateScheduleStatus, initializeCalendar, renderCalendar, saveEditedSchedule, cancelScheduleWithReason, reassignSchedule, populateAssignableUsers, serviceNames, editSchedule, saveReassignedSchedule, initScheduleView, addSchedule, deleteSchedule, confirmAttendance } from './schedule.js'; 
 import { renderFinancialReport, renderDailyNotes, addDailyNote, generateDetailedFinancialReport, downloadDailyNotes, deleteDailyNote } from './financial.js'; 
 import { setupFormHandlers } from './forms.js';
 import { renderStockList, renderStockMovements, updateStockSummary, showDeleteStockItemConfirmation } from './stock.js';
@@ -1114,6 +1115,7 @@ function populateAnamnesisSelect() {
     });
 }
 
+// [B4] START saveNewSchedule (wrapper)
 async function saveNewSchedule() {
     const clientId = parseInt(document.getElementById('select-cliente-agenda').value);
     const date = document.getElementById('data-agendamento').value;
@@ -1133,102 +1135,50 @@ async function saveNewSchedule() {
     let assignedToUserName = null;
 
     if (selectedProfessionalId) {
-        const selectedUser = db.users.find(u => u.id === parseInt(selectedProfessionalId));
-        if (selectedUser) {
-            assignedToUserId = selectedUser.id;
-            assignedToUserName = selectedUser.name;
+        const { data: userData } = await supabase.from('profiles').select('*').eq('id', selectedProfessionalId).single();
+        if (userData) {
+            assignedToUserId = userData.id;
+            assignedToUserName = userData.name;
         }
-    } else if (PROFESSIONAL_ROLES.includes(currentUser.role)) { // If current user is a professional, assign to them by default
+    } else if (PROFESSIONAL_ROLES.includes(currentUser.role)) {
         assignedToUserId = currentUser.id;
         assignedToUserName = currentUser.name;
     }
 
-    const newSchedule = {
-        id: db.nextScheduleId++,
-        clientId: clientId,
-        date: date,
-        time: time,
-        serviceType: serviceType,
-        observations: observations,
-        status: 'agendado',
-        assignedToUserId: assignedToUserId,
-        assignedToUserName: assignedToUserName
+    // Delegate to centralized addSchedule function
+    const payload = {
+        client_id: clientId,
+        date: date,          // 'YYYY-MM-DD'
+        time: time,          // 'HH:MM'
+        service_type: serviceType,
+        observations: observations || null,
+        assigned_to_user_uid: assignedToUserId || null,
+        assigned_to_user_name: assignedToUserName || null,
+        status: 'agendado'
     };
 
-    db.schedules.push(newSchedule);
+    try {
+        await addSchedule(payload);
 
-    // NEW: Create a notification for the assigned professional
-    if (assignedToUserId) {
-        const client = db.clients.find(c => c.id === clientId);
-        if (client) {
-            if (!db.notifications) db.notifications = [];
-            db.notifications.push({
-                id: db.nextNotificationId++,
-                userId: assignedToUserId,
-                type: 'schedule_assignment',
-                title: 'Novo Agendamento',
-                message: `Um novo agendamento para o paciente ${client.name} foi atribuído a você.`,
-                relatedId: newSchedule.id,
-                createdAt: new Date().toISOString(),
-                isRead: false
-            });
-        }
-    }
-
-    // Update client's assigned professional if applicable
-    if (assignedToUserId && PROFESSIONAL_ROLES.includes(db.users.find(u => u.id === assignedToUserId)?.role) && db.users.find(u => u.id === assignedToUserId)) {
-        const client = db.clients.find(c => c.id === clientId);
-        if (client) {
-            // NEW LOGIC: Add to the array of professionals instead of replacing
-            if (!client.assignedProfessionalIds) {
-                client.assignedProfessionalIds = [];
-            }
-            if (!client.assignedProfessionalIds.includes(assignedToUserId)) {
-                const oldAssignedNames = client.assignedProfessionalIds.map(id => db.users.find(u => u.id === id)?.name || 'Desconhecido').join(', ');
-                client.assignedProfessionalIds.push(assignedToUserId);
-                const newAssignedNames = client.assignedProfessionalIds.map(id => db.users.find(u => u.id === id)?.name || 'Desconhecido').join(', ');
-                
-                if (!client.changeHistory) client.changeHistory = [];
-                client.changeHistory.push({
-                    id: db.nextChangeId++,
-                    date: new Date().toISOString(),
-                    changedBy: getCurrentUser().name,
-                    changes: [
-                        {
-                            field: 'Profissionais Vinculados',
-                            oldValue: oldAssignedNames || 'Nenhum',
-                            newValue: newAssignedNames
-                        }
-                    ]
-                });
-            }
-        }
-    }
-
-    saveDb();
-    
-    document.getElementById('form-novo-agendamento').reset();
-    document.getElementById('modal-novo-agendamento').style.display = 'none';
-    renderSchedule(document.getElementById('date-selector').value);
-    renderCalendar();
-    
-    showNotification('Agendamento criado com sucesso!', 'success');
-
-    if (sendEmail) {
-        const client = db.clients.find(c => c.id === newSchedule.clientId);
-        if (client && client.email) {
-            await generateAndSendAppointmentEmail(newSchedule, client); 
-        } else if (client && !client.email) {
-            showNotification('Agendamento criado, mas não foi possível enviar a confirmação por email: Cliente sem email cadastrado.', 'warning');
-        }
+        // Clear form and close modal
+        document.getElementById('form-novo-agendamento').reset();
+        document.getElementById('modal-novo-agendamento').style.display = 'none';
+        
+        // Refresh UI
+        renderSchedule(document.getElementById('date-selector').value);
+        renderCalendar();
+        
+    } catch (error) {
+        console.error('Error in saveNewSchedule wrapper:', error);
     }
 }
+// [B4] END saveNewSchedule (wrapper)
 
 async function generateAndSendAppointmentEmail(schedule, client) {
     const nomeCliente = client.name;
     const dataAgendamento = new Date(schedule.date).toLocaleDateString('pt-BR', {timeZone: 'UTC'});
     const horaAgendamento = schedule.time;
-    const nomeProfissional = schedule.assignedToUserName || 'Não Atribuído';
+    const nomeProfissional = schedule.assigned_to_name || 'Não Atribuído';
     const nomeUnidade = 'Clínica Neuropsico'; 
     const emailCliente = client.email; 
 
@@ -1585,7 +1535,7 @@ function addMaterialSelection(modalType = 'default') {
     container.appendChild(selectionDiv);
 }
 
-function addStockItem() {
+async function addStockItem() {
     if (!checkTabAccess('estoque', 'edit')) { 
         showNotification('Você não tem permissão para adicionar itens ao estoque.', 'error'); 
         return; 
@@ -1606,53 +1556,60 @@ function addStockItem() {
         return;
     }
 
-    const newItem = {
-        id: db.nextStockItemId++,
-        name: name,
-        category: category,
-        quantity: quantity,
-        minStock: minStock,
-        unit: 'unidade', 
-        unitValue: unitValue, 
-        description: description,
-        createdAt: new Date().toISOString(),
-        createdBy: getCurrentUser().name
-    };
+    try {
+        const newItem = {
+            name: name,
+            category: category,
+            quantity: quantity,
+            min_stock: minStock,
+            unit: 'unidade', 
+            unit_value: unitValue, 
+            description: description,
+            created_by: (await getUser()).id
+        };
 
-    db.stockItems.push(newItem);
-    
-    const newMovement = { 
-        id: db.nextMovementId++,
-        itemId: newItem.id,
-        itemName: newItem.name,
-        type: 'entrada',
-        quantity: quantity,
-        reason: 'Adição inicial de estoque',
-        date: new Date().toISOString(),
-        user: getCurrentUser().name,
-        itemUnitValue: newItem.unitValue, 
-        purchaseNotes: purchaseNotes 
-    };
+        const { data: stockItem, error: stockError } = await supabase.from('stock_items').insert([newItem]).select().single();
+        if (stockError) throw stockError;
+        await hydrate('stock_items');
+        
+        const newMovement = { 
+            item_id: stockItem.id,
+            item_name: stockItem.name,
+            type: 'entrada',
+            quantity: quantity,
+            reason: 'Adição inicial de estoque',
+            user_id: (await getUser()).id,
+            item_unit_value: stockItem.unit_value, 
+            purchase_notes: purchaseNotes 
+        };
 
-    if (purchaseFile) {
-        if (purchaseFile.size > 5 * 1024 * 1024) {
-            showNotification('O comprovante de compra deve ter no máximo 5MB.', 'error');
-            return;
-        }
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            newMovement.purchaseFileData = e.target.result;
-            newMovement.purchaseFileName = purchaseFile.name;
-            db.stockMovements.push(newMovement); 
+        if (purchaseFile) {
+            if (purchaseFile.size > 5 * 1024 * 1024) {
+                showNotification('O comprovante de compra deve ter no máximo 5MB.', 'error');
+                return;
+            }
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                newMovement.purchase_file_data = e.target.result;
+                newMovement.purchase_file_name = purchaseFile.name;
+                const { error: movementError } = await supabase.from('stock_movements').insert([newMovement]);
+                if (movementError) throw movementError;
+                await hydrate('stock_movements');
+                saveAndRefreshStockUI(); 
+            };
+            reader.onerror = function() {
+                showNotification('Erro ao processar o arquivo de comprovante. Tente novamente.', 'error');
+            };
+            reader.readAsDataURL(purchaseFile);
+        } else {
+            const { error: movementError } = await supabase.from('stock_movements').insert([newMovement]);
+            if (movementError) throw movementError;
+            await hydrate('stock_movements');
             saveAndRefreshStockUI(); 
-        };
-        reader.onerror = function() {
-            showNotification('Erro ao processar o arquivo de comprovante. Tente novamente.', 'error');
-        };
-        reader.readAsDataURL(purchaseFile);
-    } else {
-        db.stockMovements.push(newMovement);
-        saveAndRefreshStockUI(); 
+        }
+    } catch (error) {
+        showNotification('Erro ao adicionar item: ' + error.message, 'error');
+        throw error;
     }
 
     function saveAndRefreshStockUI() {

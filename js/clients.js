@@ -1,5 +1,6 @@
 // Client management module
-import { db, saveDb } from './database.js';
+import { supabase, getUser } from '../lib/supabaseClient.js';
+import { hydrate } from './database.js';
 import { getCurrentUser, isRoleAllowed, DIRECTOR_ONLY, FINANCE_ONLY, DIRECTOR_OR_FINANCE, ALL_ADMIN_VIEW_CLIENTS_AND_EMPLOYEES, PROFESSIONAL_ROLES, COORDINATOR_AND_HIGHER, checkTabAccess } from './auth.js'; // Import new constants
 import { showNotification, updateGlobalSearchDatalist, switchTab } from './ui.js';
 import { formatDuration } from './utils.js'; // Import the new utility function
@@ -442,101 +443,62 @@ function renderClientDocuments(documents) {
     });
 }
 
-export function addClientNote() {
+// CLIENT NOTES
+export async function addClientNote(clientId, note) {
     // Check if current user is allowed to add notes (anyone who can access client details modal should be allowed)
-    const currentUserRole = getCurrentUser().role;
     if (!(checkTabAccess('historico', 'edit') || checkTabAccess('meus-pacientes', 'edit'))) {
         showNotification('Você não tem permissão para adicionar notas de cliente.', 'error');
         return;
     }
 
-    const client = db.clients.find(c => c.id === window.currentClientId);
-    if (!client) return;
+    try {
+        const { id: uid } = await getUser();
+        const payload = {
+            client_id: clientId,
+            title: note.title,
+            content: note.content,
+            user_id: uid
+        };
+        const { error } = await supabase.from('client_notes').insert(payload);
+        if (error) throw error;
 
-    const title = document.getElementById('note-title').value.trim();
-    const content = document.getElementById('note-content').value.trim();
-
-    if (!title || !content) {
-        showNotification('Por favor, preencha todos os campos da nota.', 'warning');
-        return;
+        showNotification('Nota adicionada com sucesso!', 'success');
+        // se sua UI lista notas separadamente, hidrate conforme necessário
+        // await hydrate('client_notes'); // se você criar essa fatia
+    } catch (error) {
+        showNotification('Erro ao adicionar nota: ' + error.message, 'error');
+        throw error;
     }
-
-    if (!client.notes) {
-        client.notes = [];
-    }
-
-    client.notes.push({
-        id: db.nextNoteId++,
-        title: title,
-        content: content,
-        date: new Date().toISOString(),
-        author: getCurrentUser().name
-    });
-
-    saveDb();
-    document.getElementById('modal-add-note').style.display = 'none';
-    showClientDetails(window.currentClientId);
-    showNotification('Nota adicionada com sucesso!', 'success');
 }
 
-export function addClientDocument() {
+// CLIENT DOCUMENTS (base64)
+export async function addClientDocument(clientId, doc) {
     // Check if current user is allowed to add documents
-    const currentUserRole = getCurrentUser().role;
     if (!(isRoleAllowed(ALL_ADMIN_VIEW_CLIENTS_AND_EMPLOYEES) || isRoleAllowed(PROFESSIONAL_ROLES))) {
         showNotification('Você não tem permissão para anexar documentos a clientes.', 'error');
         return;
     }
 
-    const client = db.clients.find(c => c.id === window.currentClientId);
-    if (!client) return;
+    try {
+        const { id: uid } = await getUser();
+        const payload = {
+            client_id: clientId,
+            title: doc.title,
+            type: doc.type,
+            description: doc.description || null,
+            file_name: doc.fileName,
+            file_data: doc.fileData, // base64 string
+            user_id: uid
+        };
+        const { error } = await supabase.from('client_documents').insert(payload);
+        if (error) throw error;
 
-    const title = document.getElementById('document-title').value.trim();
-    const type = document.getElementById('document-type').value;
-    const description = document.getElementById('document-description').value.trim();
-    const fileInput = document.getElementById('document-file');
-
-    if (!title || !type || !fileInput.files[0]) {
-        showNotification('Por favor, preencha todos os campos obrigatórios e selecione um arquivo.', 'warning');
-        return;
-    }
-
-    const file = fileInput.files[0];
-    
-    // Check file size (5MB limit)
-    if (file.size > 5 * 1024 * 1024) {
-        showNotification('O arquivo deve ter no máximo 5MB.', 'error');
-        return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = function(e) {
-        if (!client.documents) {
-            client.documents = [];
-        }
-
-        client.documents.push({
-            id: db.nextDocumentId++,
-            title: title,
-            type: type,
-            description: description,
-            fileName: file.name,
-            fileData: e.target.result,
-            uploadDate: new Date().toISOString(),
-            uploadedBy: getCurrentUser().name
-        });
-
-        saveDb();
-        document.getElementById('modal-add-document').style.display = 'none';
-        document.getElementById('form-add-document').reset();
-        showClientDetails(window.currentClientId);
         showNotification('Documento anexado com sucesso!', 'success');
-    };
-
-    reader.onerror = function() {
-        showNotification('Erro ao processar o arquivo. Tente novamente.', 'error');
-    };
-
-    reader.readAsDataURL(file);
+        // await hydrate('client_documents'); // se necessário para sua UI
+    } catch (error) {
+        showNotification('Erro ao anexar documento: ' + error.message, 'error');
+        throw error;
+    }
 }
 
 export function deleteClientDocument(documentId) {
@@ -1219,33 +1181,127 @@ export function unassignProfessionalFromClient() {
 }
 
 // NEW: Delete client (Coordinator only)
-export function deleteClient(clientId) {
+// DELETE
+export async function deleteClient(id) {
     if (!checkTabAccess('historico', 'edit') || !isRoleAllowed(DIRECTOR_ONLY)) { // Only Director can delete
         showNotification('Você não tem permissão para excluir clientes.', 'error');
         return;
     }
 
-    const clientToDelete = db.clients.find(c => c.id === clientId);
-    if (!clientToDelete) {
-        showNotification('Cliente não encontrado.', 'error');
+    try {
+        const { error } = await supabase.from('clients').delete().eq('id', id);
+        if (error) throw error;
+
+        await hydrate('clients');
+        showNotification(`Cliente excluído com sucesso.`, 'success');
+    } catch (error) {
+        showNotification('Erro ao excluir cliente: ' + error.message, 'error');
+        throw error;
+    }
+}
+
+// NEW: Add client (General User with default values)
+// CREATE
+export async function addClient(newClientFields) {
+    if (!checkTabAccess('historico', 'add')) {
+        showNotification('Você não tem permissão para adicionar clientes.', 'error');
         return;
     }
 
-    const clientName = clientToDelete.name;
+    try {
+        const { id: uid } = await getUser();
+        const payload = {
+            // mapeie do seu form (camelCase) para snake_case do DB:
+            type: newClientFields.type,             // 'adult'|'minor'
+            name: newClientFields.name,
+            email: newClientFields.email || null,
+            phone: newClientFields.phone || null,
+            birth_date: newClientFields.birthDate || null,
+            gender: newClientFields.gender || null,
+            cpf: newClientFields.cpf || null,
+            rg: newClientFields.rg || null,
+            naturalidade: newClientFields.naturalidade || null,
+            estado_civil: newClientFields.estadoCivil || null,
+            escolaridade: newClientFields.escolaridade || null,
+            profissao: newClientFields.profissao || null,
+            contato_emergencia: newClientFields.contatoEmergencia || null,
+            unit: newClientFields.unit || null,                 // 'madre'|'floresta'
+            cep: newClientFields.cep || null,
+            address: newClientFields.address || null,
+            number: newClientFields.number || null,
+            complement: newClientFields.complement || null,
+            neighborhood: newClientFields.neighborhood || null,
+            city: newClientFields.city || null,
+            state: newClientFields.state || null,
+            observations: newClientFields.observations || null,
+            diagnostico_principal: newClientFields.diagnosticoPrincipal || null,
+            historico_medico: newClientFields.historicoMedico || null,
+            queixa_neuropsicologica: newClientFields.queixaNeuropsicologica || null,
+            expectativas_tratamento: newClientFields.expectativasTratamento || null,
+            assigned_professional_uids: newClientFields.assignedProfessionalUids || [],
+            user_id: uid
+        };
 
-    // Remove client from clients array
-    db.clients = db.clients.filter(c => c.id !== clientId);
+        const { error } = await supabase.from('clients').insert(payload);
+        if (error) throw error;
 
-    // Remove any schedules associated with this client
-    db.schedules = db.schedules.filter(s => s.clientId !== clientId);
+        await hydrate('clients');
+        showNotification(`Cliente ${newClientFields.name} adicionado com sucesso.`, 'success');
+    } catch (error) {
+        showNotification('Erro ao adicionar cliente: ' + error.message, 'error');
+        throw error;
+    }
+}
 
-    // Appointments are stored *within* the client object, so they are removed automatically.
-    
-    saveDb();
-    document.getElementById('modal-detalhes-cliente').style.display = 'none'; // Close details modal
-    renderClientList(); // Re-render the client list
-    showNotification(`Cliente "${clientName}" excluído com sucesso!`, 'success');
-    updateGlobalSearchDatalist();
+// UPDATE
+export async function editClient(id, patch) {
+    if (!checkTabAccess('historico', 'edit')) {
+        showNotification('Você não tem permissão para editar clientes.', 'error');
+        return;
+    }
+
+    try {
+        const updateData = {
+            type: patch.type,
+            name: patch.name,
+            email: patch.email,
+            phone: patch.phone,
+            birth_date: patch.birthDate,
+            gender: patch.gender,
+            cpf: patch.cpf,
+            rg: patch.rg,
+            naturalidade: patch.naturalidade,
+            estado_civil: patch.estadoCivil,
+            escolaridade: patch.escolaridade,
+            profissao: patch.profissao,
+            contato_emergencia: patch.contatoEmergencia,
+            unit: patch.unit,
+            cep: patch.cep,
+            address: patch.address,
+            number: patch.number,
+            complement: patch.complement,
+            neighborhood: patch.neighborhood,
+            city: patch.city,
+            state: patch.state,
+            observations: patch.observations,
+            diagnostico_principal: patch.diagnosticoPrincipal,
+            historico_medico: patch.historicoMedico,
+            queixa_neuropsicologica: patch.queixaNeuropsicologica,
+            expectativas_tratamento: patch.expectativasTratamento,
+            assigned_professional_uids: patch.assignedProfessionalUids
+        };
+        // limpa undefined pra não sobrescrever campos sem querer
+        Object.keys(updateData).forEach(k => updateData[k] === undefined && delete updateData[k]);
+
+        const { error } = await supabase.from('clients').update(updateData).eq('id', id);
+        if (error) throw error;
+
+        await hydrate('clients');
+        showNotification(`Cliente atualizado com sucesso.`, 'success');
+    } catch (error) {
+        showNotification('Erro ao editar cliente: ' + error.message, 'error');
+        throw error;
+    }
 }
 
 // NEW FUNCTION: Render Client Change History

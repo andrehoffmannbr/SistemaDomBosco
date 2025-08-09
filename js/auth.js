@@ -1,5 +1,6 @@
 // Authentication module
-import { db, saveDb } from './database.js';
+import { supabase, getUser } from '../lib/supabaseClient.js';
+import { hydrateAll } from './database.js';
 
 export let currentUser = null;
 
@@ -33,19 +34,25 @@ export const DIRECTOR_AND_COORDINATORS_ONLY_DOCUMENTS = ['director', 'coordinato
 // NEW: All users, for tab visibility (e.g. general view for "Mural do Coordenador")
 export const ALL_USERS = ['director', 'coordinator_madre', 'coordinator_floresta', 'staff', 'intern', 'musictherapist', 'financeiro', 'receptionist', 'psychologist', 'psychopedagogue', 'speech_therapist', 'nutritionist', 'physiotherapist'];
 
-export function login(username, password) {
-    const user = db.users.find(u => u.username === username && u.password === password);
-    if (user) {
-        currentUser = user;
-        localStorage.setItem('currentUser', JSON.stringify(user));
-        return true;
-    }
-    return false;
+export async function login(username, password) {
+  const { data, error } = await supabase.auth.signInWithPassword({ email: username, password });
+  if (error) return { ok: false, error };
+  const user = await getUser();
+  if (!user) return { ok: false, error: new Error('Sessão inválida') };
+  const { data: profile, error: pErr } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+  if (pErr) return { ok: false, error: pErr };
+  const currentUser = {
+    id: profile.id, name: profile.name, role: profile.role,
+    email: profile.email, phone: profile.phone, tabAccess: profile.tab_access || {}
+  };
+  localStorage.setItem('currentUser', JSON.stringify(currentUser));
+  await hydrateAll();
+  return { ok: true, user: currentUser };
 }
 
-export function logout() {
-    currentUser = null;
-    localStorage.removeItem('currentUser');
+export async function logout() {
+  await supabase.auth.signOut();
+  localStorage.removeItem('currentUser');
 }
 
 export function checkLogin() {
@@ -58,7 +65,8 @@ export function checkLogin() {
 }
 
 export function getCurrentUser() {
-    return currentUser;
+  try { const raw = localStorage.getItem('currentUser'); return raw ? JSON.parse(raw) : null; }
+  catch { return null; }
 }
 
 // New: Role-based access control helper
