@@ -92,52 +92,52 @@ function setupClientForms() {
                 return; // Stop the form submission
             }
 
-            const newClient = {
-                id: db.nextClientId++,
+            const payload = {
                 type: 'adult',
-                name: document.getElementById('nome-cliente-adulto').value,
-                email: document.getElementById('email-cliente-adulto').value,
-                phone: document.getElementById('telefone-cliente-adulto').value,
-                birthDate: document.getElementById('data-nascimento-adulto').value,
-                gender: document.getElementById('genero-adulto').value,
-                cpf: cpfValue,
-                rg: document.getElementById('rg-adulto').value,
-                naturalidade: document.getElementById('naturalidade-adulto').value,
-                estadoCivil: document.getElementById('estado-civil-adulto').value,
-                escolaridade: document.getElementById('escolaridade-adulto').value,
-                profissao: document.getElementById('profissao-adulto').value,
-                contatoEmergencia: document.getElementById('contato-emergencia-adulto').value,
-                unit: document.getElementById('unidade-atendimento-adulto').value,
-                cep: document.getElementById('cep-cliente-adulto').value,
-                address: document.getElementById('logradouro-cliente-adulto').value,
-                number: document.getElementById('numero-cliente-adulto').value,
-                complement: document.getElementById('complemento-cliente-adulto').value,
-                neighborhood: document.getElementById('bairro-cliente-adulto').value,
-                city: document.getElementById('cidade-cliente-adulto').value,
-                state: document.getElementById('estado-cidade-adulto').value,
-                observations: document.getElementById('observacoes-cliente-adulto').value,
-                diagnosticoPrincipal: document.getElementById('diagnostico-principal-adulto').value,
-                historicoMedico: document.getElementById('historico-medico-adulto').value,
-                queixaNeuropsicologica: document.getElementById('queixa-neuropsicologica-adulto').value,
-                expectativasTratamento: document.getElementById('expectativas-tratamento-adulto').value,
-                appointments: [],
-                notes: [],
-                documents: [],
-                changeHistory: [], // Initialize change history for new clients
-                createdByUserId: currentUser.id, // Store the ID of the user who created this client
-                assignedProfessionalIds: [], // New clients start unassigned
+                name: document.getElementById('nome-cliente-adulto').value?.trim(),
+                email: document.getElementById('email-cliente-adulto').value?.trim() || null,
+                phone: document.getElementById('telefone-cliente-adulto').value?.trim() || null,
+                birth_date: document.getElementById('data-nascimento-adulto').value || null,
+                gender: document.getElementById('genero-adulto').value || null,
+                cpf: cpfValue || null,
+                rg: document.getElementById('rg-adulto').value?.trim() || null,
+                naturalidade: document.getElementById('naturalidade-adulto').value?.trim() || null,
+                estado_civil: document.getElementById('estado-civil-adulto').value || null,
+                escolaridade: document.getElementById('escolaridade-adulto').value || null,
+                profissao: document.getElementById('profissao-adulto').value?.trim() || null,
+                contato_emergencia: document.getElementById('contato-emergencia-adulto').value?.trim() || null,
+                unit: document.getElementById('unidade-atendimento-adulto').value || null,
+                cep: document.getElementById('cep-cliente-adulto').value?.trim() || null,
+                address: document.getElementById('logradouro-cliente-adulto').value?.trim() || null,
+                number: document.getElementById('numero-cliente-adulto').value?.trim() || null,
+                complement: document.getElementById('complemento-cliente-adulto').value?.trim() || null,
+                neighborhood: document.getElementById('bairro-cliente-adulto').value?.trim() || null,
+                city: document.getElementById('cidade-cliente-adulto').value?.trim() || null,
+                state: document.getElementById('estado-cidade-adulto').value?.trim() || null,
+                observations: document.getElementById('observacoes-cliente-adulto').value?.trim() || null,
+                diagnostico_principal: document.getElementById('diagnostico-principal-adulto').value?.trim() || null,
+                historico_medico: document.getElementById('historico-medico-adulto').value?.trim() || null,
+                queixa_neuropsicologica: document.getElementById('queixa-neuropsicologica-adulto').value?.trim() || null,
+                expectativas_tratamento: document.getElementById('expectativas-tratamento-adulto').value?.trim() || null
             };
             
-            if (!newClient.name || !newClient.birthDate) {
+            if (!payload.name || !payload.birth_date) {
                 showNotification('Por favor, preencha pelo menos o nome e data de nascimento.', 'warning');
                 return;
             }
-            if (!newClient.unit) {
+            if (!payload.unit) {
                 showNotification('Por favor, selecione a unidade de atendimento.', 'warning');
                 return;
             }
             
-            await addClient(newClient);
+            try {
+                await addClient(payload);
+                showNotification('Cliente cadastrado com sucesso.', 'success');
+                document.getElementById('form-cliente-adulto').reset();
+            } catch (e) {
+                console.error('Erro ao cadastrar cliente:', e);
+                showNotification('Erro ao cadastrar cliente. Tente novamente.', 'error');
+            }
             e.target.reset();
             renderClientList();
             switchTab('historico');
@@ -152,60 +152,51 @@ function setupClientForms() {
         e.preventDefault();
         
         try {
-            const currentUser = getCurrentUser(); // Get the current user
-            const newClient = {
-                id: db.nextClientId++,
+            const payload = {
                 type: 'minor',
-                name: document.getElementById('nome-cliente-menor').value,
-                birthDate: document.getElementById('data-nascimento-menor').value,
-                gender: document.getElementById('genero-menor').value,
-                escola: document.getElementById('escola-menor').value,
-                tipoEscola: document.getElementById('tipo-escola-menor').value,
-                anoEscolar: document.getElementById('ano-escolar-menor').value,
-                unit: document.getElementById('unidade-atendimento-menor').value,
-                nomePai: document.getElementById('nome-pai').value,
-                idadePai: document.getElementById('idade-pai').value,
-                profissaoPai: document.getElementById('profissao-pai').value,
-                telefonePai: document.getElementById('telefone-pai').value,
-                nomeMae: document.getElementById('nome-mae').value,
-                idadeMae: document.getElementById('idade-mae').value,
-                profissaoMae: document.getElementById('profissao-mae').value,
-                telefoneMae: document.getElementById('telefone-mae').value,
-                responsavelFinanceiro: document.getElementById('responsavel-financeiro').value,
-                outroResponsavel: document.getElementById('outro-responsavel').value,
-                cep: document.getElementById('cep-cliente-menor').value,
-                address: document.getElementById('logradouro-cliente-menor').value,
-                number: document.getElementById('numero-cliente-menor').value,
-                complement: document.getElementById('complemento-cliente-menor').value,
-                neighborhood: document.getElementById('bairro-cliente-menor').value,
-                city: document.getElementById('cidade-cliente-menor').value,
-                state: document.getElementById('estado-cliente-menor').value,
-                observations: document.getElementById('observacoes-cliente-menor').value,
-                diagnosticoPrincipal: document.getElementById('diagnostico-principal-menor').value,
-                historicoMedico: document.getElementById('historico-medico-menor').value,
-                queixaNeuropsicologica: document.getElementById('queixa-neuropsicologica-menor').value,
-                expectativasTratamento: document.getElementById('expectativas-tratamento-menor').value,
-                appointments: [],
-                notes: [],
-                documents: [],
-                changeHistory: [], // Initialize change history for new clients
-                createdByUserId: currentUser.id, // Store the ID of the user who created this client
-                assignedProfessionalIds: [], // New clients start unassigned
+                name: document.getElementById('nome-cliente-menor').value?.trim(),
+                birth_date: document.getElementById('data-nascimento-menor').value || null,
+                gender: document.getElementById('genero-menor').value || null,
+                escola: document.getElementById('escola-menor').value?.trim() || null,
+                tipo_escola: document.getElementById('tipo-escola-menor').value || null,
+                ano_escolar: document.getElementById('ano-escolar-menor').value || null,
+                unit: document.getElementById('unidade-atendimento-menor').value || null,
+                nome_pai: document.getElementById('nome-pai').value?.trim() || null,
+                idade_pai: document.getElementById('idade-pai').value?.trim() || null,
+                profissao_pai: document.getElementById('profissao-pai').value?.trim() || null,
+                telefone_pai: document.getElementById('telefone-pai').value?.trim() || null,
+                nome_mae: document.getElementById('nome-mae').value?.trim() || null,
+                idade_mae: document.getElementById('idade-mae').value?.trim() || null,
+                profissao_mae: document.getElementById('profissao-mae').value?.trim() || null,
+                telefone_mae: document.getElementById('telefone-mae').value?.trim() || null,
+                responsavel_financeiro: document.getElementById('responsavel-financeiro').value?.trim() || null,
+                outro_responsavel: document.getElementById('outro-responsavel').value?.trim() || null,
+                cep: document.getElementById('cep-cliente-menor').value?.trim() || null,
+                address: document.getElementById('logradouro-cliente-menor').value?.trim() || null,
+                number: document.getElementById('numero-cliente-menor').value?.trim() || null,
+                complement: document.getElementById('complemento-cliente-menor').value?.trim() || null,
+                neighborhood: document.getElementById('bairro-cliente-menor').value?.trim() || null,
+                city: document.getElementById('cidade-cliente-menor').value?.trim() || null,
+                state: document.getElementById('estado-cliente-menor').value?.trim() || null,
+                observations: document.getElementById('observacoes-cliente-menor').value?.trim() || null,
+                diagnostico_principal: document.getElementById('diagnostico-principal-menor').value?.trim() || null,
+                historico_medico: document.getElementById('historico-medico-menor').value?.trim() || null,
+                queixa_neuropsicologica: document.getElementById('queixa-neuropsicologica-menor').value?.trim() || null,
+                expectativas_tratamento: document.getElementById('expectativas-tratamento-menor').value?.trim() || null
             };
             
-            if (!newClient.name || !newClient.birthDate) {
+            if (!payload.name || !payload.birth_date) {
                 showNotification('Por favor, preencha pelo menos o nome e data de nascimento.', 'warning');
                 return;
             }
-            if (!newClient.unit) {
+            if (!payload.unit) {
                 showNotification('Por favor, selecione a unidade de atendimento.', 'warning');
                 return;
             }
             
-            // [B4] Replace db.clients.push with Supabase function call
-            await addClient(newClient);
+            await addClient(payload);
             e.target.reset();
-            showNotification(`Cliente "${newClient.name}" cadastrado com sucesso!`, 'success');
+            showNotification(`Cliente "${payload.name}" cadastrado com sucesso!`, 'success');
             renderClientList();
             switchTab('historico');
             updateGlobalSearchDatalist();
@@ -517,7 +508,7 @@ function saveClientChanges() {
         }
         
         client.changeHistory.push({
-            id: db.nextChangeId++,
+            id: (globalThis.crypto?.randomUUID?.() || String(Date.now())),
             date: new Date().toISOString(),
             changedBy: getCurrentUser().name,
             changes: changes

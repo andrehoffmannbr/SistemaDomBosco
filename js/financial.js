@@ -1,7 +1,7 @@
 // Financial reporting module
 import { supabase, getUser } from '../lib/supabaseClient.js';
 import { db, hydrate } from './database.js';
-import { getCurrentUser, isRoleAllowed, DIRECTOR_OR_FINANCE, DIRECTOR_ONLY } from './auth.js'; // Import isRoleAllowed and new role constant
+import { getCurrentUser, isRoleAllowed, isUserRoleIn, DIRECTOR_OR_FINANCE, DIRECTOR_ONLY } from './auth.js'; // Import isRoleAllowed and new role constant
 import { showNotification } from './ui.js';
 import { serviceNames } from './schedule.js'; // Import serviceNames for detailed reports
 
@@ -40,7 +40,7 @@ export async function deleteDailyNote(id) {
 
 export function renderFinancialReport(selectedPeriod = 'current-month') {
     // Only Director and Finance roles can view financial reports
-    if (!isRoleAllowed(DIRECTOR_OR_FINANCE)) {
+    if (!isUserRoleIn(DIRECTOR_OR_FINANCE)) {
         const financialList = document.getElementById('financial-list');
         if (financialList) {
             financialList.innerHTML = '<p>Você não tem permissão para visualizar relatórios financeiros.</p>';
@@ -270,7 +270,7 @@ function renderFinancialDetails(startDate, endDate) {
 
 export function renderDailyNotes(selectedPeriod = 'current-month') {
     // Only Director and Finance roles can view daily notes
-    if (!isRoleAllowed(DIRECTOR_OR_FINANCE)) {
+    if (!isUserRoleIn(DIRECTOR_OR_FINANCE)) {
         const dailyNotesList = document.getElementById('daily-notes-list');
         if (dailyNotesList) {
             dailyNotesList.innerHTML = '<p>Você não tem permissão para visualizar notas diárias.</p>';
@@ -385,7 +385,7 @@ export function renderDailyNotes(selectedPeriod = 'current-month') {
 // [B4] UI WRAPPER - addDailyNote (calls centralized function)
 export async function addDailyNoteUI() {
     // Only Director and Finance roles can add daily notes
-    if (!isRoleAllowed(DIRECTOR_OR_FINANCE)) {
+    if (!isUserRoleIn(DIRECTOR_OR_FINANCE)) {
         showNotification('Você não tem permissão para adicionar notas diárias financeiras.', 'error');
         return;
     }
@@ -471,7 +471,7 @@ export async function addDailyNoteUI() {
 // [B4] UI WRAPPER - deleteDailyNote (calls centralized function)
 export async function deleteDailyNoteUI(noteId) {
     // Only Director and Finance roles can delete daily notes
-    if (!isRoleAllowed(DIRECTOR_OR_FINANCE)) {
+    if (!isUserRoleIn(DIRECTOR_OR_FINANCE)) {
         showNotification('Você não tem permissão para excluir notas diárias financeiras.', 'error');
         return;
     }
@@ -489,7 +489,7 @@ export async function deleteDailyNoteUI(noteId) {
 
 export function generateDetailedFinancialReport(selectedPeriod) {
     // Only Director and Finance roles can generate detailed financial reports
-    if (!isRoleAllowed(DIRECTOR_OR_FINANCE)) {
+    if (!isUserRoleIn(DIRECTOR_OR_FINANCE)) {
         showNotification('Você não tem permissão para gerar relatórios financeiros.', 'error');
         return;
     }
@@ -921,7 +921,7 @@ export function generateDetailedFinancialReport(selectedPeriod) {
 }
 
 export function downloadDailyNotes(selectedPeriod = 'all') {
-    if (!isRoleAllowed(DIRECTOR_OR_FINANCE)) {
+    if (!isUserRoleIn(DIRECTOR_OR_FINANCE)) {
         showNotification('Você não tem permissão para baixar notas diárias.', 'error');
         return;
     }

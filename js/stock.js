@@ -1,14 +1,14 @@
 // Stock management module
 import { supabase, getUser } from '../lib/supabaseClient.js';
-import { hydrate } from './database.js';
-import { getCurrentUser, isRoleAllowed, DIRECTOR_ONLY, STOCK_MANAGERS } from './auth.js';
+import { db, hydrate } from './database.js';
+import { getCurrentUser, isRoleAllowed, isUserRoleIn, DIRECTOR_ONLY, STOCK_MANAGERS } from './auth.js';
 
 export function renderStockList() {
     const stockList = document.getElementById('stock-list');
     if (!stockList) return;
     
     // Only Director and Finance can view stock
-    if (!isRoleAllowed(STOCK_MANAGERS)) {
+    if (!isUserRoleIn(STOCK_MANAGERS)) {
         stockList.innerHTML = '<p>Você não tem permissão para visualizar o estoque.</p>';
         return;
     }
@@ -153,7 +153,7 @@ export function renderStockMovements(selectedMonthYear = null) {
     if (!stockMovements) return;
 
     // Only Director and Finance can view stock movements
-    if (!isRoleAllowed(STOCK_MANAGERS)) {
+    if (!isUserRoleIn(STOCK_MANAGERS)) {
         stockMovements.innerHTML = '<p>Você não tem permissão para visualizar movimentações de estoque.</p>';
         return;
     }
@@ -286,7 +286,7 @@ export function renderStockMovements(selectedMonthYear = null) {
 
 export function updateStockSummary() {
     // Only Director and Finance can view stock summary
-    if (!isRoleAllowed(STOCK_MANAGERS)) {
+    if (!isUserRoleIn(STOCK_MANAGERS)) {
         return;
     }
 
@@ -330,7 +330,7 @@ export function updateStockSummary() {
 
 export async function adjustStock(itemId, action) {
     // Only Director and Finance can adjust stock
-    if (!isRoleAllowed(STOCK_MANAGERS)) { 
+    if (!isUserRoleIn(STOCK_MANAGERS)) { 
         showNotification('Você não tem permissão para ajustar o estoque.', 'error'); 
         return; 
     }
@@ -372,7 +372,7 @@ export async function adjustStock(itemId, action) {
 
 // NEW: Update stock function
 export async function updateStock(itemId, quantity, reason, action = 'adjustment') {
-    if (!isRoleAllowed(STOCK_MANAGERS)) {
+    if (!isUserRoleIn(STOCK_MANAGERS)) {
         showNotification('Você não tem permissão para atualizar o estoque.', 'error');
         return;
     }
@@ -423,7 +423,7 @@ export async function updateStock(itemId, quantity, reason, action = 'adjustment
 
 export function showDeleteStockItemConfirmation(itemId) {
     // Only Director and Finance can delete stock items
-    if (!isRoleAllowed(STOCK_MANAGERS)) { 
+    if (!isUserRoleIn(STOCK_MANAGERS)) { 
         showNotification('Você não tem permissão para excluir itens do estoque.', 'error'); 
         return; 
     }

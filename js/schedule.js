@@ -1,7 +1,7 @@
 // Schedule management module
 import { supabase, getUser } from '../lib/supabaseClient.js';
 import { hydrate, db } from './database.js';
-import { getCurrentUser, isRoleAllowed, PROFESSIONAL_ROLES, COORDINATOR_AND_HIGHER, ALL_SCHEDULE_VIEW_EDIT_MANAGERS, checkTabAccess } from './auth.js'; // Import constants
+import { getCurrentUser, isRoleAllowed, isUserRoleIn, PROFESSIONAL_ROLES, COORDINATOR_AND_HIGHER, ALL_SCHEDULE_VIEW_EDIT_MANAGERS, checkTabAccess } from './auth.js'; // Import constants
 import { showNotification } from './ui.js';
 import { showClientDetails } from './clients.js'; // Import showClientDetails to re-render client modal
 import { pushNotification } from './notifications.js';
@@ -35,7 +35,7 @@ export function initScheduleView() {
     if (!professionalFilterContainer || !professionalFilterSelect || !professionalRoleFilterContainer || !professionalRoleFilterSelect || !unitFilterContainer || !unitFilterSelect) return;
 
     const currentUser = getCurrentUser();
-    const isManager = isRoleAllowed(ALL_SCHEDULE_VIEW_EDIT_MANAGERS);
+    const isManager = isUserRoleIn(ALL_SCHEDULE_VIEW_EDIT_MANAGERS);
 
     if (isManager) {
         professionalFilterContainer.style.display = 'block';
@@ -162,7 +162,7 @@ export function renderSchedule(selectedDate = null) {
         return;
     }
 
-    const isManager = isRoleAllowed(ALL_SCHEDULE_VIEW_EDIT_MANAGERS);
+    const isManager = isUserRoleIn(ALL_SCHEDULE_VIEW_EDIT_MANAGERS);
     let professionalIdFilter = 'all';
     let unitFilter = 'all';
 
@@ -456,7 +456,7 @@ export function renderCalendar() {
     const currentUser = getCurrentUser(); // Get current user
 
     // Determine which professional's appointments to show on the calendar
-    const isManager = isRoleAllowed(ALL_SCHEDULE_VIEW_EDIT_MANAGERS);
+    const isManager = isUserRoleIn(ALL_SCHEDULE_VIEW_EDIT_MANAGERS);
     let professionalIdFilter = 'all';
     let unitFilter = 'all';
     if (isManager) {
@@ -640,7 +640,7 @@ export async function saveReassignedSchedule() {
             // Add a change history entry for the client's assignment
             if (!client.changeHistory) client.changeHistory = [];
             client.changeHistory.push({
-                id: db.nextChangeId++,
+                id: (globalThis.crypto?.randomUUID?.() || String(Date.now())),
                 date: new Date().toISOString(),
                 changedBy: getCurrentUser().name,
                 changes: [
@@ -687,7 +687,7 @@ export function populateAssignableUsers() {
         });
         select.disabled = false;
         select.value = ''; // Ensure no default selection for directors/coordinators/receptionists
-    } else if (checkTabAccess('agenda', 'view') && isRoleAllowed(PROFESSIONAL_ROLES)) {
+    } else if (checkTabAccess('agenda', 'view') && isUserRoleIn(PROFESSIONAL_ROLES)) {
         // If they only have view access and are a professional, they can only assign to themselves.
         const option = document.createElement('option');
         option.value = currentUser.id;

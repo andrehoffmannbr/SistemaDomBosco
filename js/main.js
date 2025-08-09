@@ -1,7 +1,7 @@
 // Main application entry point
 import { supabase, getUser, getSession } from '../lib/supabaseClient.js';
 import { hydrateAll, hydrate, db } from './database.js';
-import { login, logout, checkLogin, getCurrentUser, isRoleAllowed, DIRECTOR_ONLY, FINANCE_ONLY, DIRECTOR_OR_FINANCE, STOCK_MANAGERS, ALL_USERS, PROFESSIONAL_ROLES, COORDINATOR_AND_HIGHER, NON_FINANCE_ACCESS, ALL_ADMIN_VIEW_CLIENTS_AND_EMPLOYEES, DIRECTOR_AND_PROFESSIONALS, DIRECTOR_AND_COORDINATORS_ONLY_DOCUMENTS, checkTabAccess } from './auth.js'; 
+import { login, logout, checkLogin, getCurrentUser, isRoleAllowed, isUserRoleIn, DIRECTOR_ONLY, FINANCE_ONLY, DIRECTOR_OR_FINANCE, STOCK_MANAGERS, ALL_USERS, PROFESSIONAL_ROLES, COORDINATOR_AND_HIGHER, NON_FINANCE_ACCESS, ALL_ADMIN_VIEW_CLIENTS_AND_EMPLOYEES, DIRECTOR_AND_PROFESSIONALS, DIRECTOR_AND_COORDINATORS_ONLY_DOCUMENTS, checkTabAccess } from './auth.js'; 
 import { showLoginScreen, showMainApp, switchTab, updateCurrentDate, showNotification, updateGlobalSearchDatalist } from './ui.js'; 
 import { renderClientList, showClientDetails, addClientNote, addClientDocument, deleteClientDocument, renderMeusPacientes, renderClientReport, showAssignProfessionalModal, assignProfessionalToClient, unassignProfessionalFromClient, deleteClient, duplicateClient, showEmployeeReport, showClientReportModal, generateClientReport } from './clients.js'; 
 import { renderSchedule, updateScheduleStatus, initializeCalendar, renderCalendar, saveEditedSchedule, cancelScheduleWithReason, reassignSchedule, populateAssignableUsers, serviceNames, editSchedule, saveReassignedSchedule, initScheduleView, addSchedule, deleteSchedule, confirmAttendance } from './schedule.js'; 
@@ -728,7 +728,7 @@ function setupEventListeners() {
             }
         } else if (window.currentDeleteItemType === 'role') {
             const roleIdToDelete = window.currentDeleteItem;
-            if (checkTabAccess('funcionarios', 'edit') && isRoleAllowed(DIRECTOR_ONLY) && roleIdToDelete) {
+            if (checkTabAccess('funcionarios', 'edit') && isUserRoleIn(DIRECTOR_ONLY) && roleIdToDelete) {
                 deleteRole(roleIdToDelete);
             } else {
                 showNotification('Você não tem permissão para excluir cargos.', 'error');
@@ -872,7 +872,7 @@ function setupEventListeners() {
 
     // NEW: Role Management button
     document.getElementById('btn-manage-roles').addEventListener('click', () => {
-        if (!checkTabAccess('funcionarios', 'edit') || !isRoleAllowed(DIRECTOR_ONLY)) {
+        if (!checkTabAccess('funcionarios', 'edit') || !isUserRoleIn(DIRECTOR_ONLY)) {
             showNotification('Você não tem permissão para gerenciar cargos.', 'error');
             return;
         }

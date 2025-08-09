@@ -2,7 +2,7 @@
 import { supabase } from '../lib/supabaseClient.js';
 import { db, hydrate } from './database.js';
 import { showNotification, updateGlobalSearchDatalist } from './ui.js';
-import { getCurrentUser, isRoleAllowed, ALL_ADMIN_VIEW_CLIENTS_AND_EMPLOYEES, DIRECTOR_ONLY, PROFESSIONAL_ROLES, COORDINATOR_AND_HIGHER, checkTabAccess } from './auth.js'; // Import hasEditAccess
+import { getCurrentUser, isRoleAllowed, isUserRoleIn, ALL_ADMIN_VIEW_CLIENTS_AND_EMPLOYEES, DIRECTOR_ONLY, PROFESSIONAL_ROLES, COORDINATOR_AND_HIGHER, checkTabAccess } from './auth.js'; // Import hasEditAccess
 import { showClientDetails } from './clients.js'; // Import showClientDetails to re-render client modal
 import { formatDuration } from './utils.js'; // Import duration formatting utility
 
@@ -126,7 +126,7 @@ export function renderFuncionarioList(filter = '', roleFilter = 'all') {
         return;
     }
 
-    const isDirector = isRoleAllowed(DIRECTOR_ONLY);
+    const isDirector = isUserRoleIn(DIRECTOR_ONLY);
     const permissionsInfo = document.getElementById('permissions-view-info');
     if (permissionsInfo) {
         permissionsInfo.style.display = isDirector ? 'flex' : 'none';
@@ -281,7 +281,7 @@ function renderPermissionsView(funcionarios, isSelfView = false) {
 }
 
 export function saveUserPermissions(userId) {
-    if (!isRoleAllowed(DIRECTOR_ONLY)) {
+    if (!isUserRoleIn(DIRECTOR_ONLY)) {
         showNotification('Você não tem permissão para alterar permissões.', 'error');
         return;
     }
@@ -322,7 +322,7 @@ export function saveUserPermissions(userId) {
             user.changeHistory = [];
         }
         user.changeHistory.push({
-            id: db.nextChangeId++,
+            id: (globalThis.crypto?.randomUUID?.() || String(Date.now())),
             date: new Date().toISOString(),
             changedBy: getCurrentUser().name,
             changes: [{
@@ -383,7 +383,7 @@ export function showFuncionarioDetails(funcionarioId) {
     document.getElementById('modal-detalhes-funcionario').style.display = 'flex';
 
     // Director can edit any employee (except their own permissions in grid, but full edit in modal)
-    const canEditDirector = isRoleAllowed(DIRECTOR_ONLY); 
+    const canEditDirector = isUserRoleIn(DIRECTOR_ONLY); 
     // Check if the current user has 'edit' access to the 'funcionarios' tab
     const canEditFuncionarioTab = checkTabAccess('funcionarios', 'edit');
 
@@ -546,7 +546,7 @@ export function showEditFuncionarioModal(funcionarioId) {
 
     const currentUser = getCurrentUser();
     // Disable editing tab permissions if the user is a director trying to edit themselves.
-    const isEditingSelfAsDirector = (funcionario.id === currentUser.id && isRoleAllowed(DIRECTOR_ONLY));
+    const isEditingSelfAsDirector = (funcionario.id === currentUser.id && isUserRoleIn(DIRECTOR_ONLY));
     // Pass user.role to populateTabPermissions to determine default access
     populateTabPermissions('edit-funcionario-tab-permissions', funcionario.tabAccess || {}, isEditingSelfAsDirector, funcionario.role);
 
@@ -576,7 +576,7 @@ export function showEditFuncionarioModal(funcionarioId) {
 // NEW FUNCTION: Show Edit Password Modal
 export function showEditPasswordModal(funcionarioId) {
     // Check if the current user has edit access to the 'funcionarios' tab and is a director
-    if (!checkTabAccess('funcionarios', 'edit') || !isRoleAllowed(DIRECTOR_ONLY)) {
+    if (!checkTabAccess('funcionarios', 'edit') || !isUserRoleIn(DIRECTOR_ONLY)) {
         showNotification('Você não tem permissão para alterar a senha de funcionários.', 'error');
         return;
     }
@@ -612,7 +612,7 @@ export function saveFuncionarioChanges() {
 
     const currentUser = getCurrentUser();
     // For director editing themselves, we explicitly prevent tab access modification here to prevent accidental lockout.
-    const isEditingSelfAsDirector = (funcionario.id === currentUser.id && isRoleAllowed(DIRECTOR_ONLY));
+    const isEditingSelfAsDirector = (funcionario.id === currentUser.id && isUserRoleIn(DIRECTOR_ONLY));
 
 
     const changes = [];
@@ -711,7 +711,7 @@ export function saveFuncionarioChanges() {
         }
         
         funcionario.changeHistory.push({
-            id: db.nextChangeId++,
+            id: (globalThis.crypto?.randomUUID?.() || String(Date.now())),
             date: new Date().toISOString(),
             changedBy: getCurrentUser().name,
             changes: changes
@@ -732,7 +732,7 @@ export function saveFuncionarioChanges() {
 
 export function deleteFuncionario(funcionarioId) {
     // Check if the current user has edit access to the 'funcionarios' tab and is a director
-    if (!checkTabAccess('funcionarios', 'edit') || !isRoleAllowed(DIRECTOR_ONLY)) {
+    if (!checkTabAccess('funcionarios', 'edit') || !isUserRoleIn(DIRECTOR_ONLY)) {
         showNotification('Você não tem permissão para excluir funcionários.', 'error');
         return;
     }
@@ -769,7 +769,7 @@ export function deleteFuncionario(funcionarioId) {
 
             if (!client.changeHistory) client.changeHistory = [];
             client.changeHistory.push({
-                id: db.nextChangeId++,
+                id: (globalThis.crypto?.randomUUID?.() || String(Date.now())),
                 date: new Date().toISOString(),
                 changedBy: getCurrentUser().name,
                 changes: [{ field: 'Profissional Vinculado', oldValue: oldAssignedNames, newValue: newAssignedNames || 'Nenhum (Funcionário excluído)' }]
@@ -791,29 +791,13 @@ export function addFuncionario(funcionarioData) {
         return false;
     }
 
-    if (db.users.some(u => u.username === funcionarioData.username)) {
-        showNotification('Nome de usuário já existe. Por favor, escolha outro.', 'error');
-        return false;
-    }
-
-    // Block registration of duplicate CPF for employees
-    if (funcionarioData.cpf && db.users.some(u => u.cpf && u.cpf === funcionarioData.cpf)) {
-        showNotification('Já existe um funcionário cadastrado com este CPF.', 'error');
-        return false;
-    }
-    
-    const newUser = {
-        id: db.nextUserId++,
-        ...funcionarioData,
-        academicInfo: funcionarioData.academicInfo || {}, // Ensure academicInfo is an object
-        tabAccess: funcionarioData.tabAccess === undefined ? null : funcionarioData.tabAccess, // Ensure tabAccess is null if not provided
-        changeHistory: []
-    };
-    
-    db.users.push(newUser);
-    // (removido) saveDb()
-    showNotification(`Funcionário "${funcionarioData.name}" cadastrado com sucesso!`, 'success');
-    return true;
+    // 🔒 Criação de contas no FRONT está desativada
+    // Contas novas devem ser criadas via Supabase Auth (Dashboard) ou backend com Service Role.
+    // Depois da criação no Auth, insira/atualize o profile correspondente e chame hydrate('users').
+    console.warn('Criação de usuários via front desativada. Use o Dashboard do Supabase.');
+    alert('Criação de usuários pelo sistema está desativada.\n\nUse o Dashboard do Supabase (Auth → Add user) e depois edite o perfil aqui.');
+    hydrate('users');
+    return false;
 }
 
 // Function to populate tab permissions dropdowns (used in add and edit modals, and permissions grid)

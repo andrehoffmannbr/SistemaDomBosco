@@ -1,7 +1,7 @@
 // Client management module
 import { supabase, getUser } from '../lib/supabaseClient.js';
-import { hydrate } from './database.js';
-import { getCurrentUser, isUserRoleIn, DIRECTOR_ONLY, FINANCE_ONLY, DIRECTOR_OR_FINANCE, ALL_ADMIN_VIEW_CLIENTS_AND_EMPLOYEES, PROFESSIONAL_ROLES, COORDINATOR_AND_HIGHER, checkTabAccess } from './auth.js'; // Import new constants
+import { db, hydrate } from './database.js';
+import { getCurrentUser, isRoleAllowed, isUserRoleIn, DIRECTOR_ONLY, FINANCE_ONLY, DIRECTOR_OR_FINANCE, ALL_ADMIN_VIEW_CLIENTS_AND_EMPLOYEES, PROFESSIONAL_ROLES, COORDINATOR_AND_HIGHER, checkTabAccess } from './auth.js'; // Import new constants
 import { showNotification, updateGlobalSearchDatalist, switchTab } from './ui.js';
 import { formatDuration } from './utils.js'; // Import the new utility function
 import { pushNotification } from './notifications.js';
@@ -571,7 +571,7 @@ export function renderMeusPacientes(filter = '') {
 export function renderClientReport(selectedPeriod = 'all') {
     // The role check for renderClientReport needs to be updated to match the tab visibility
     // If the tab is visible to ALL_ADMIN_VIEW_CLIENTS_AND_EMPLOYEES, then the report should render for them.
-    if (!isRoleAllowed(ALL_ADMIN_VIEW_CLIENTS_AND_EMPLOYEES)) { // Updated role check
+    if (!isUserRoleIn(ALL_ADMIN_VIEW_CLIENTS_AND_EMPLOYEES)) { // Updated role check
         // If not allowed, clear the report dashboard and show a message
         const reportDashboard = document.querySelector('.client-report-dashboard');
         if (reportDashboard) {
@@ -1140,7 +1140,7 @@ export function assignProfessionalToClient() { // This function is now for savin
     // Add change history
     if (!client.changeHistory) client.changeHistory = [];
     client.changeHistory.push({
-        id: db.nextChangeId++,
+        id: (globalThis.crypto?.randomUUID?.() || String(Date.now())),
         date: new Date().toISOString(),
         changedBy: getCurrentUser().name,
         changes: [{
@@ -1184,7 +1184,7 @@ export function unassignProfessionalFromClient() {
 // NEW: Delete client (Coordinator only)
 // DELETE
 export async function deleteClient(id) {
-    if (!checkTabAccess('historico', 'edit') || !isRoleAllowed(DIRECTOR_ONLY)) { // Only Director can delete
+    if (!checkTabAccess('historico', 'edit') || !isUserRoleIn(DIRECTOR_ONLY)) { // Only Director can delete
         showNotification('Você não tem permissão para excluir clientes.', 'error');
         return;
     }
