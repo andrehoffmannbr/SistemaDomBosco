@@ -1,6 +1,6 @@
 // Main application entry point
 import { supabase, getUser, getSession } from '../lib/supabaseClient.js';
-import { hydrateAll, hydrate } from './database.js';
+import { hydrateAll, hydrate, db } from './database.js';
 import { login, logout, checkLogin, getCurrentUser, isRoleAllowed, DIRECTOR_ONLY, FINANCE_ONLY, DIRECTOR_OR_FINANCE, STOCK_MANAGERS, ALL_USERS, PROFESSIONAL_ROLES, COORDINATOR_AND_HIGHER, NON_FINANCE_ACCESS, ALL_ADMIN_VIEW_CLIENTS_AND_EMPLOYEES, DIRECTOR_AND_PROFESSIONALS, DIRECTOR_AND_COORDINATORS_ONLY_DOCUMENTS, checkTabAccess } from './auth.js'; 
 import { showLoginScreen, showMainApp, switchTab, updateCurrentDate, showNotification, updateGlobalSearchDatalist } from './ui.js'; 
 import { renderClientList, showClientDetails, addClientNote, addClientDocument, deleteClientDocument, renderMeusPacientes, renderClientReport, showAssignProfessionalModal, assignProfessionalToClient, unassignProfessionalFromClient, deleteClient, duplicateClient, showEmployeeReport, showClientReportModal, generateClientReport } from './clients.js'; 
@@ -1062,38 +1062,35 @@ function setupEventListeners() {
 
 // [LOGIN-FIX] Função init para proteger contra dupla ligação do form de login
 async function init() {
-    // bind de submit (sem reload) e chamada do auth com proteção contra dupla ligação
+    // handler corrigido: só mostra erro quando realmente falhar
     const form = document.getElementById('form-login');
-    const usernameInput = document.getElementById('username');
-    const passInput = document.getElementById('password');
-
-    if (form && usernameInput && passInput && !form.dataset.bound) {
-        // Remove listener existente se houver e adiciona um novo
-        const existingHandlers = form.cloneNode(true);
-        form.parentNode.replaceChild(existingHandlers, form);
-        
-        document.getElementById('form-login').addEventListener('submit', async (e) => {
+    if (form && !form.dataset.bound) {
+        form.dataset.bound = '1';
+        form.addEventListener('submit', async (e) => {
             e.preventDefault();
-            const username = document.getElementById('username').value?.trim() || '';
-            const password = document.getElementById('password').value || '';
-            
+            const emailInput = document.getElementById('username');
+            const passInput  = document.getElementById('password');
+            const submitBtn  = form.querySelector('button[type="submit"]');
             try {
-                const result = await login(username, password);
-                if (result && result.user) {
-                    document.getElementById('form-login').reset();
-                    showMainApp();
-                    initializeApp();
-                    checkNotifications(); 
-                    resetIdleTimer();
-                } else {
-                    showNotification('Usuário ou senha inválidos!', 'error');
+                submitBtn && (submitBtn.disabled = true);
+                const res = await login(emailInput.value.trim(), passInput.value);
+                if (!res || res.ok !== true) {
+                    showNotification('Erro ao tentar fazer login. Verifique e tente novamente.', 'error');
+                    return;
                 }
-            } catch (error) {
-                console.error('Erro no login:', error);
+                // Sucesso: auth.js já chama hydrateAll()
+                showNotification('Login efetuado com sucesso.', 'success');
+                showMainApp();
+                initializeApp();
+                checkNotifications(); 
+                resetIdleTimer();
+            } catch (err) {
+                console.error('Login error:', err);
                 showNotification('Erro ao tentar fazer login. Tente novamente.', 'error');
+            } finally {
+                submitBtn && (submitBtn.disabled = false);
             }
         });
-        document.getElementById('form-login').dataset.bound = '1';
     }
 }
 
@@ -1278,7 +1275,7 @@ async function generateAndSendAppointmentEmail(schedule, client) {
     }
 }
 
-function saveNewAttendance() {
+async function saveNewAttendance() {
     const client = db.clients.find(c => c.id === window.currentClientId);
     if (!client) return;
 
@@ -1299,54 +1296,33 @@ function saveNewAttendance() {
         client.appointments = [];
     }
 
-    const newAppointment = {
-        id: db.nextAppointmentId++,
+    // NOVO: usar inserção direta no Supabase + hydrate
+    const appointmentData = {
+        client_id: client.id,
         date: date,
-        anamnesisTypeId: anamnesisTypeId,
+        anamnesis_type_id: anamnesisTypeId,
         notes: notes,
         value: value,
-        durationHours: durationHours,
-        attendedBy: getCurrentUser().name,
-        internId: getCurrentUser().role === 'intern' ? getCurrentUser().id : null
+        duration_hours: durationHours,
+        attended_by: getCurrentUser().name,
+        intern_id: getCurrentUser().role === 'intern' ? getCurrentUser().id : null
     };
 
-    if (attachments.length > 0) {
-        newAppointment.attachments = [];
-        let filesProcessed = 0;
+    try {
+        const { data, error } = await supabase.from('appointments').insert(appointmentData).select().single();
+        if (error) throw error;
         
-        Array.from(attachments).forEach(file => {
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                newAppointment.attachments.push({
-                    fileName: file.name,
-                    fileData: e.target.result,
-                    uploadDate: new Date().toISOString()
-                });
-                
-                filesProcessed++;
-                if (filesProcessed === attachments.length) {
-                    client.appointments.push(newAppointment);
-                    // (removido) saveDb()
-                    
-                    document.getElementById('form-novo-atendimento').reset();
-                    document.getElementById('modal-novo-atendimento').style.display = 'none';
-                    showClientDetails(window.currentClientId);
-                    
-                    showNotification('Histórico adicionado com sucesso!', 'success');
-                }
-            };
-            reader.readAsDataURL(file);
-        });
-    } else {
-        // No attachments, save directly
-        client.appointments.push(newAppointment);
-        // (removido) saveDb()
+        // Hydrate appointments to update UI
+        await hydrate('appointments');
         
         document.getElementById('form-novo-atendimento').reset();
         document.getElementById('modal-novo-atendimento').style.display = 'none';
         showClientDetails(window.currentClientId);
         
         showNotification('Histórico adicionado com sucesso!', 'success');
+    } catch (error) {
+        console.error('Erro ao salvar appointment:', error);
+        showNotification('Erro ao salvar histórico. Tente novamente.', 'error');
     }
 }
 
@@ -1392,7 +1368,7 @@ function saveCancellation() {
     }
 }
 
-function saveAttendanceConfirmation() {
+async function saveAttendanceConfirmation() {
     const schedule = db.schedules.find(s => s.id === window.currentConfirmingScheduleId);
     if (!schedule) return;
 
@@ -1416,7 +1392,7 @@ function saveAttendanceConfirmation() {
     
     let hasInsufficientStock = false; 
     
-    materialSelections.forEach(selection => {
+    for (const selection of materialSelections) {
         const itemId = parseInt(selection.querySelector('.material-item').value);
         const quantity = parseInt(selection.querySelector('.material-quantity').value) || 0;
         
@@ -1431,23 +1407,8 @@ function saveAttendanceConfirmation() {
                         unit: stockItem.unit
                     });
                     
-                    stockItem.quantity -= quantity;
-                    
-                    db.stockMovements.push({
-                        id: db.nextMovementId++,
-                        itemId: itemId,
-                        itemName: stockItem.name,
-                        type: 'saida',
-                        quantity: quantity,
-                        reason: `Atendimento - ${client.name}`,
-                        date: new Date().toISOString(),
-                        user: getCurrentUser().name,
-                        scheduleId: schedule.id,
-                        itemUnitValue: stockItem.unitValue,
-                        purchaseNotes: null, 
-                        purchaseFileData: null,
-                        purchaseFileName: null
-                    });
+                    // NOVO: usa API canônica (Supabase + hydrate)
+                    await updateStock(itemId, -quantity, `Atendimento - ${client.name}`);
                 } else {
                     showNotification(`Estoque insuficiente para ${stockItem.name}. Disponível: ${stockItem.quantity} unidades.`, 'error');
                     hasInsufficientStock = true;
@@ -1455,7 +1416,7 @@ function saveAttendanceConfirmation() {
                 }
             }
         }
-    });
+    }
 
     if (hasInsufficientStock) {
         return;
@@ -1472,59 +1433,45 @@ function saveAttendanceConfirmation() {
         internIdForAttendance = getCurrentUser().id;
     }
 
-    const newAppointment = {
-        id: db.nextAppointmentId++,
+    // NOVO: usar inserção direta no Supabase + hydrate  
+    const appointmentData = {
+        client_id: client.id,
         date: schedule.date,
         time: schedule.time,
-        serviceType: schedule.serviceType,
+        service_type: schedule.serviceType,
         notes: observations,
         value: value,
-        durationHours: durationHours,
-        attendedBy: professional, 
-        materialsUsed: materialsUsed,
+        duration_hours: durationHours,
+        attended_by: professional,
+        materials_used: JSON.stringify(materialsUsed),
         status: 'concluido',
-        confirmedAt: new Date().toISOString(),
-        internId: internIdForAttendance
+        confirmed_at: new Date().toISOString(),
+        intern_id: internIdForAttendance
     };
 
-    if (attachments.length > 0) {
-        newAppointment.attachments = [];
-        let filesProcessed = 0;
-        
-        Array.from(attachments).forEach(file => {
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                newAppointment.attachments.push({
-                    fileName: file.name,
-                    fileData: e.target.result,
-                    uploadDate: new Date().toISOString()
-                });
-                
-                filesProcessed++;
-                if (filesProcessed === attachments.length) {
-                    finalizeConfirmation();
-                }
-            };
-            reader.readAsDataURL(file);
-        });
-    } else {
-        finalizeConfirmation();
-    }
+    try {
+        const { data: newAppointment, error } = await supabase.from('appointments').insert(appointmentData).select().single();
+        if (error) throw error;
 
-    function finalizeConfirmation() {
-        client.appointments.push(newAppointment);
-        schedule.status = 'concluido';
-        schedule.confirmedAt = new Date().toISOString();
-        schedule.attendanceId = newAppointment.id;
+        // Update schedule status
+        await supabase.from('schedules')
+            .update({ 
+                status: 'concluido', 
+                confirmed_at: new Date().toISOString(),
+                attendance_id: newAppointment.id
+            })
+            .eq('id', schedule.id);
 
-        // (removido) saveDb()
-        
+        // Hydrate to update UI
+        await hydrate('appointments');
+        await hydrate('schedules');
+
         document.getElementById('form-confirmar-atendimento').reset();
         document.getElementById('modal-confirmar-atendimento').style.display = 'none';
         renderSchedule(document.getElementById('date-selector').value);
         renderCalendar();
         
-        if (checkTabAccess('estoque', 'view') || checkTabAccess('financeiro', 'view')) { // Check permission for stock/finance tabs
+        if (checkTabAccess('estoque', 'view') || checkTabAccess('financeiro', 'view')) {
             renderStockList();
             renderStockMovements();
             updateStockSummary();
@@ -1533,6 +1480,9 @@ function saveAttendanceConfirmation() {
         }
         
         showNotification('Atendimento confirmado com sucesso!', 'success');
+    } catch (error) {
+        console.error('Erro ao confirmar atendimento:', error);
+        showNotification('Erro ao confirmar atendimento. Tente novamente.', 'error');
     }
 }
 
@@ -1642,7 +1592,7 @@ async function handleAddStockItem() {
     }
 }
 
-function processStockAdjustment() {
+async function processStockAdjustment() {
     if (!checkTabAccess('estoque', 'edit')) { 
         showNotification('Você não tem permissão para ajustar o estoque.', 'error'); 
         return; 
@@ -1665,26 +1615,9 @@ function processStockAdjustment() {
         return;
     }
     
-    if (action === 'add') {
-        item.quantity += quantity;
-    } else {
-        item.quantity -= quantity;
-    }
-    
-    db.stockMovements.push({
-        id: db.nextMovementId++,
-        itemId: itemId,
-        itemName: item.name,
-        type: action === 'add' ? 'entrada' : 'saida',
-        quantity: quantity,
-        reason: reason,
-        date: new Date().toISOString(),
-        user: getCurrentUser().name,
-        itemUnitValue: item.unitValue,
-        purchaseNotes: null, 
-        purchaseFileData: null,
-        purchaseFileName: null
-    });
+    // NOVO: usa API canônica (Supabase + hydrate)
+    const delta = action === 'add' ? quantity : -quantity;
+    await updateStock(itemId, delta, reason);
     
     // (removido) saveDb()
     
