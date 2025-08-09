@@ -2,6 +2,7 @@
 import { supabase, getUser } from '../lib/supabaseClient.js';
 import { db, hydrate } from './database.js';
 import { getCurrentUser, isRoleAllowed, isUserRoleIn, DIRECTOR_ONLY, STOCK_MANAGERS } from './auth.js';
+import { addColumnIfExists } from './utils.js';
 
 export function renderStockList() {
     const stockList = document.getElementById('stock-list');
@@ -464,9 +465,7 @@ export async function addStockItem(item) {
 
         // Verifica se a coluna 'created_by' existe no schema antes de adicionar
         // Isto evita o erro "Could not find the 'created_by' column" em ambientes sem essa coluna
-        if (db?.stockItems && db.stockItems.length > 0 && 'created_by' in db.stockItems[0]) {
-            payload.created_by = user.id;
-        }
+        addColumnIfExists(payload, db.stockItems, 'created_by', user.id);
 
         const { data: stockItem, error: stockError } = await supabase
             .from('stock_items')
@@ -482,7 +481,7 @@ export async function addStockItem(item) {
                 item_id: stockItem.id,
                 item_name: stockItem.name,
                 type: 'entrada',
-                quantity: newItem.quantity,
+                quantity: payload.quantity,
                 reason: item.reason || 'Adição inicial de estoque',
                 user_id: user.id,
                 item_unit_value: stockItem.unit_value,
@@ -504,7 +503,13 @@ export async function addStockItem(item) {
         return stockItem;
     } catch (error) {
         console.error('Error adding stock item:', error);
-        throw error;
+        
+        // Melhoria do feedback de erro para o usuário
+        if (error.message?.includes('created_by')) {
+            throw new Error('Erro de configuração do sistema. Contate o administrador.');
+        } else {
+            throw new Error(`Erro ao adicionar item: ${error.message || 'Erro desconhecido'}`);
+        }
     }
 }
 

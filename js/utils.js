@@ -31,3 +31,10 @@ export function convertTimeToDecimalHours(timeString) {
     const [hours, minutes] = timeString.split(':').map(Number);
     return hours + (minutes / 60);
 }
+
+// Função utilitária para adicionar coluna apenas se existir no schema
+export function addColumnIfExists(payload, tableCache, column, value) {
+    if (tableCache?.length && column in tableCache[0]) {
+        payload[column] = value;
+    }
+}
