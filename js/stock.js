@@ -445,6 +445,78 @@ export function showDeleteStockItemConfirmation(itemId) {
     modal.style.display = 'flex';
 }
 
+// [B4] NEW: Add stock item function (migrated from main.js)
+export async function addStockItem(item) {
+    try {
+        const user = await getUser();
+        if (!user) throw new Error('Usuário não autenticado');
+
+        const newItem = {
+            name: item.name,
+            category: item.category,
+            quantity: item.quantity || 0,
+            min_stock: item.minStock || item.min_stock || 0,
+            unit: item.unit || 'unidade',
+            unit_value: item.unitValue || item.unit_value || 0,
+            description: item.description || '',
+            user_id: user.id,
+            created_by: user.id
+        };
+
+        const { data: stockItem, error: stockError } = await supabase
+            .from('stock_items')
+            .insert([newItem])
+            .select()
+            .single();
+        
+        if (stockError) throw stockError;
+
+        // If quantity > 0, create initial stock movement
+        if (newItem.quantity > 0) {
+            const movement = {
+                item_id: stockItem.id,
+                item_name: stockItem.name,
+                type: 'entrada',
+                quantity: newItem.quantity,
+                reason: item.reason || 'Adição inicial de estoque',
+                user_id: user.id,
+                item_unit_value: stockItem.unit_value,
+                purchase_notes: item.purchaseNotes || '',
+                purchase_file_data: item.purchaseFileData || null,
+                purchase_file_name: item.purchaseFileName || null
+            };
+
+            const { error: movementError } = await supabase
+                .from('stock_movements')
+                .insert([movement]);
+            
+            if (movementError) throw movementError;
+        }
+
+        await hydrate('stockItems');
+        await hydrate('stockMovements');
+        
+        return stockItem;
+    } catch (error) {
+        console.error('Error adding stock item:', error);
+        throw error;
+    }
+}
+
+// [B4] NEW: Delete stock item function
+export async function deleteStockItem(itemId) {
+    try {
+        // RLS: só dono ou admin consegue deletar item. Movements caem por ON DELETE CASCADE.
+        const { error } = await supabase.from('stock_items').delete().eq('id', itemId);
+        if (error) throw error;
+        await hydrate('stockItems');
+        await hydrate('stockMovements');
+    } catch (error) {
+        console.error('Error deleting stock item:', error);
+        throw error;
+    }
+}
+
 // Make functions globally available
 window.adjustStock = adjustStock;
 window.showDeleteStockItemConfirmation = showDeleteStockItemConfirmation;

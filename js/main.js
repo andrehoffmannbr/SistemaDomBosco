@@ -7,8 +7,10 @@ import { renderClientList, showClientDetails, addClientNote, addClientDocument, 
 import { renderSchedule, updateScheduleStatus, initializeCalendar, renderCalendar, saveEditedSchedule, cancelScheduleWithReason, reassignSchedule, populateAssignableUsers, serviceNames, editSchedule, saveReassignedSchedule, initScheduleView, addSchedule, deleteSchedule, confirmAttendance } from './schedule.js'; 
 import { renderFinancialReport, renderDailyNotes, addDailyNote, generateDetailedFinancialReport, downloadDailyNotes, deleteDailyNote } from './financial.js'; 
 import { setupFormHandlers } from './forms.js';
-import { renderStockList, renderStockMovements, updateStockSummary, showDeleteStockItemConfirmation } from './stock.js';
+import { renderStockList, renderStockMovements, updateStockSummary, showDeleteStockItemConfirmation, addStockItem, updateStock, deleteStockItem } from './stock.js';
 import { renderFuncionarioList, showFuncionarioDetails, showEditFuncionarioModal, saveFuncionarioChanges, deleteFuncionario, addFuncionario, showEditPasswordModal, populateTabPermissions, saveUserPermissions, initRolesManagement, deleteRole } from './funcionarios.js'; 
+import { addGeneralDocument as addGeneralDocumentAPI, deleteGeneralDocument as deleteGeneralDocumentAPI } from './mural.js';
+import { pushNotification, markNotificationRead, fetchMyNotifications } from './notifications.js';
 import { convertTimeToDecimalHours } from './utils.js'; 
 
 // --- Inactivity Logout Variables ---
@@ -30,6 +32,29 @@ function logoutUser() {
     showNotification('Você foi desconectado(a) devido à inatividade.', 'info', 'Inatividade', 7000);
 }
 
+// [B4] Teste temporário - criar notificação
+window.testNotification = async () => {
+    const currentUser = getCurrentUser();
+    if (!currentUser) {
+        console.log('Usuário não logado');
+        return;
+    }
+    
+    try {
+        await pushNotification({
+            user_id: currentUser.id,
+            type: 'info',
+            title: 'Teste de Notificação',
+            message: 'Esta é uma notificação de teste do sistema.'
+        });
+        showNotification('Notificação de teste criada com sucesso!', 'success');
+        await checkNotifications();
+    } catch (error) {
+        console.error('Erro ao criar notificação de teste:', error);
+        showNotification('Erro ao criar notificação: ' + error.message, 'error');
+    }
+};
+
 // Make necessary functions globally available for onclicks or direct access
 window.showClientDetails = showClientDetails;
 window.updateScheduleStatus = updateScheduleStatus;
@@ -44,7 +69,8 @@ window.showFuncionarioDetails = showFuncionarioDetails;
 window.showEditFuncionarioModal = showEditFuncionarioModal; 
 window.showEditPasswordModal = showEditPasswordModal; 
 window.deleteFuncionario = deleteFuncionario; 
-window.deleteMuralItem = (id) => { 
+// [B4] Wrapper UI — excluir documento do mural
+window.deleteMuralItem = async (id) => { 
     const itemToDelete = db.generalDocuments.find(d => d.id === id);
     if (!itemToDelete) return;
 
@@ -55,9 +81,9 @@ window.deleteMuralItem = (id) => {
     const message = document.getElementById('delete-confirmation-message');
     
     let confirmationText = '';
-    if (itemToDelete.documentType === 'note') {
+    if (itemToDelete.document_type === 'note') {
         confirmationText = `Tem certeza que deseja excluir a nota "${itemToDelete.title}"?`;
-    } else if (itemToDelete.documentType === 'reuniao') {
+    } else if (itemToDelete.document_type === 'reuniao') {
         confirmationText = `Tem certeza que deseja excluir a reunião "${itemToDelete.title}"? Uma notificação será enviada aos participantes sobre o cancelamento.`;
     } else {
         confirmationText = `Tem certeza que deseja excluir o documento "${itemToDelete.title}"?`;
@@ -651,35 +677,19 @@ function setupEventListeners() {
         addMaterialSelection('confirm');
     });
 
-    document.getElementById('btn-confirm-delete').addEventListener('click', () => {
+    document.getElementById('btn-confirm-delete').addEventListener('click', async () => {
         // Consolidated permission check for deletion actions
         if (window.currentDeleteItemType === 'stock') {
             const itemIdToDelete = window.currentDeleteItem;
-            if (checkTabAccess('estoque', 'edit') && itemIdToDelete) { // Use checkTabAccess
-                const itemIndex = db.stockItems.findIndex(item => item.id === itemIdToDelete);
-                if (itemIndex !== -1) {
-                    const itemToDelete = db.stockItems[itemIndex];
-                     // Add a movement record for deletion
-                    db.stockMovements.push({
-                        id: db.nextMovementId++,
-                        itemId: itemToDelete.id, 
-                        itemName: itemToDelete.name,
-                        type: 'exclusao',
-                        quantity: itemToDelete.quantity, 
-                        reason: 'Item excluído do estoque',
-                        date: new Date().toISOString(),
-                        user: getCurrentUser().name,
-                        itemUnitValue: itemToDelete.unitValue,
-                        purchaseNotes: null, 
-                        purchaseFileData: null,
-                        purchaseFileName: null
-                    });
-                    db.stockItems.splice(itemIndex, 1);
-                    saveDb();
+            if (checkTabAccess('estoque', 'edit') && itemIdToDelete) {
+                try {
+                    await deleteStockItem(itemIdToDelete);
+                    showNotification('Item excluído do estoque com sucesso!', 'success');
                     renderStockList();
                     renderStockMovements();
                     updateStockSummary();
-                    showNotification(`Item "${itemToDelete.name}" excluído do estoque com sucesso!`, 'success');
+                } catch (error) {
+                    showNotification('Erro ao excluir item: ' + error.message, 'error');
                 }
             } else {
                 showNotification('Você não tem permissão para realizar esta exclusão.', 'error');
@@ -701,7 +711,13 @@ function setupEventListeners() {
         } else if (window.currentDeleteItemType === 'generalDocument') {
             const docIdToDelete = window.currentDeleteItem;
             if (checkTabAccess('documentos', 'edit') && docIdToDelete) { // Use checkTabAccess
-                deleteMuralItemConfirm(docIdToDelete);
+                try {
+                    await deleteGeneralDocumentAPI(docIdToDelete);
+                    renderGeneralDocuments();
+                    showNotification('Documento excluído com sucesso!', 'success');
+                } catch (error) {
+                    showNotification('Erro ao excluir documento: ' + error.message, 'error');
+                }
             } else {
                 showNotification('Você não tem permissão para excluir este item.', 'error');
             }
@@ -1535,6 +1551,7 @@ function addMaterialSelection(modalType = 'default') {
     container.appendChild(selectionDiv);
 }
 
+// [B4] WRAPPER — addStockItem (delegates to stock.js)
 async function addStockItem() {
     if (!checkTabAccess('estoque', 'edit')) { 
         showNotification('Você não tem permissão para adicionar itens ao estoque.', 'error'); 
@@ -1557,30 +1574,14 @@ async function addStockItem() {
     }
 
     try {
-        const newItem = {
+        const itemData = {
             name: name,
             category: category,
             quantity: quantity,
-            min_stock: minStock,
-            unit: 'unidade', 
-            unit_value: unitValue, 
+            minStock: minStock,
+            unitValue: unitValue,
             description: description,
-            created_by: (await getUser()).id
-        };
-
-        const { data: stockItem, error: stockError } = await supabase.from('stock_items').insert([newItem]).select().single();
-        if (stockError) throw stockError;
-        await hydrate('stock_items');
-        
-        const newMovement = { 
-            item_id: stockItem.id,
-            item_name: stockItem.name,
-            type: 'entrada',
-            quantity: quantity,
-            reason: 'Adição inicial de estoque',
-            user_id: (await getUser()).id,
-            item_unit_value: stockItem.unit_value, 
-            purchase_notes: purchaseNotes 
+            purchaseNotes: purchaseNotes
         };
 
         if (purchaseFile) {
@@ -1590,22 +1591,19 @@ async function addStockItem() {
             }
             const reader = new FileReader();
             reader.onload = async function(e) {
-                newMovement.purchase_file_data = e.target.result;
-                newMovement.purchase_file_name = purchaseFile.name;
-                const { error: movementError } = await supabase.from('stock_movements').insert([newMovement]);
-                if (movementError) throw movementError;
-                await hydrate('stock_movements');
-                saveAndRefreshStockUI(); 
+                itemData.purchaseFileData = e.target.result;
+                itemData.purchaseFileName = purchaseFile.name;
+                
+                await addStockItem(itemData);
+                saveAndRefreshStockUI();
             };
             reader.onerror = function() {
                 showNotification('Erro ao processar o arquivo de comprovante. Tente novamente.', 'error');
             };
             reader.readAsDataURL(purchaseFile);
         } else {
-            const { error: movementError } = await supabase.from('stock_movements').insert([newMovement]);
-            if (movementError) throw movementError;
-            await hydrate('stock_movements');
-            saveAndRefreshStockUI(); 
+            await addStockItem(itemData);
+            saveAndRefreshStockUI();
         }
     } catch (error) {
         showNotification('Erro ao adicionar item: ' + error.message, 'error');
@@ -1613,7 +1611,6 @@ async function addStockItem() {
     }
 
     function saveAndRefreshStockUI() {
-        saveDb();
         document.getElementById('form-add-stock').reset();
         document.getElementById('modal-add-stock').style.display = 'none';
         renderStockList();
@@ -1889,7 +1886,8 @@ function renderGeneralDocuments(filter = '', typeFilter = '') {
     });
 }
 
-function addGeneralDocument() {
+// [B4] Wrapper UI — criar documento do mural
+async function addGeneralDocument() {
     if (!checkTabAccess('documentos', 'edit')) { 
         showNotification('Você não tem permissão para adicionar documentos gerais.', 'error'); 
         return; 
@@ -1913,41 +1911,37 @@ function addGeneralDocument() {
         return;
     }
 
-    const reader = new FileReader();
-    reader.onload = function(e) {
-        if (!db.generalDocuments) {
-            db.generalDocuments = [];
-        }
+    try {
+        const fileData = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+        });
 
-        const newDocument = {
-            id: db.nextGeneralDocumentId++,
+        const payload = {
             title: title,
             type: type,
             description: description,
-            fileName: file.name,
-            fileData: e.target.result,
-            createdAt: new Date().toISOString(),
-            createdBy: getCurrentUser().name,
-            documentType: 'file'
+            file_name: file.name,
+            file_data: fileData,
+            document_type: 'file'
         };
 
-        db.generalDocuments.push(newDocument);
-        saveDb();
+        await addGeneralDocumentAPI(payload);
         
         document.getElementById('modal-add-general-document').style.display = 'none';
         document.getElementById('form-add-general-document').reset();
         renderGeneralDocuments();
         showNotification('Documento adicionado com sucesso!', 'success');
-    };
-
-    reader.onerror = function() {
+    } catch (error) {
         showNotification('Erro ao processar o arquivo. Tente novamente.', 'error');
-    };
-
-    reader.readAsDataURL(file);
+        console.error('Erro ao adicionar documento:', error);
+    }
 }
 
-function addGeneralNote() {
+// [B4] Wrapper UI — criar nota do mural
+async function addGeneralNote() {
     if (!checkTabAccess('documentos', 'edit')) { 
         showNotification('Você não tem permissão para adicionar notas gerais.', 'error'); 
         return; 
@@ -1962,34 +1956,32 @@ function addGeneralNote() {
         return;
     }
 
-    if (!db.generalDocuments) {
-        db.generalDocuments = [];
+    try {
+        const payload = {
+            title: title,
+            type: type,
+            content: content,
+            document_type: 'note'
+        };
+
+        await addGeneralDocumentAPI(payload);
+        
+        document.getElementById('modal-add-general-note').style.display = 'none';
+        document.getElementById('form-add-general-note').reset();
+        renderGeneralDocuments();
+        showNotification('Nota adicionada com sucesso!', 'success');
+    } catch (error) {
+        showNotification('Erro ao criar nota: ' + error.message, 'error');
+        console.error('Erro ao adicionar nota:', error);
     }
-
-    const newNote = {
-        id: db.nextGeneralDocumentId++,
-        title: title,
-        type: type,
-        content: content,
-        createdAt: new Date().toISOString(),
-        createdBy: getCurrentUser().name,
-        documentType: 'note'
-    };
-
-    db.generalDocuments.push(newNote);
-    saveDb();
-    
-    document.getElementById('modal-add-general-note').style.display = 'none';
-    document.getElementById('form-add-general-note').reset();
-    renderGeneralDocuments();
-    showNotification('Nota adicionada com sucesso!', 'success');
 }
 
 // NEW: Function to check and show meeting notifications on login
-function checkNotifications() {
+// [B4] Sininho — carregar e marcar notificações
+async function checkNotifications() {
     const notificationCheckDelay = 500;
 
-    setTimeout(() => {
+    setTimeout(async () => {
         const currentUser = getCurrentUser();
         if (!currentUser) return;
 
@@ -1999,67 +1991,69 @@ function checkNotifications() {
 
         if (!notificationBell || !notificationCountBadge || !notificationList) return;
 
-        const unreadNotifications = (db.notifications || []).filter(n => n.userId === currentUser.id && !n.isRead);
-        
-        const allUserNotifications = (db.notifications || [])
-            .filter(n => n.userId === currentUser.id)
-            .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        try {
+            const myNotifications = await fetchMyNotifications();
+            const unreadNotifications = myNotifications.filter(n => !n.is_read);
 
-        notificationList.innerHTML = ''; 
+            notificationList.innerHTML = ''; 
 
-        if (allUserNotifications.length > 0) {
-            if (unreadNotifications.length > 0) {
-                notificationCountBadge.textContent = unreadNotifications.length;
-                notificationCountBadge.style.display = 'flex';
+            if (myNotifications.length > 0) {
+                if (unreadNotifications.length > 0) {
+                    notificationCountBadge.textContent = unreadNotifications.length;
+                    notificationCountBadge.style.display = 'flex';
+                } else {
+                    notificationCountBadge.style.display = 'none';
+                }
+
+                const notificationIcons = {
+                    'meeting_invite': 'fa-users',
+                    'meeting_cancellation': 'fa-calendar-times', 
+                    'schedule_assignment': 'fa-calendar-check',
+                    'client_assignment': 'fa-user-plus'
+                };
+
+                myNotifications.slice(0, 10).forEach(notification => { 
+                    const icon = notificationIcons[notification.type] || 'fa-bell';
+                    const item = document.createElement('div');
+                    item.className = `notification-item ${notification.is_read ? '' : 'unread'}`; 
+                    item.innerHTML = `
+                        <div class="notification-item-icon"><i class="fa-solid ${icon}"></i></div>
+                        <div class="notification-item-content">
+                            <h5>${notification.title}</h5>
+                            <p>${notification.message}</p>
+                            <p class="notification-timestamp">${new Date(notification.created_at).toLocaleString('pt-BR')}</p>
+                        </div>
+                    `;
+                    notificationList.appendChild(item);
+                });
+
             } else {
                 notificationCountBadge.style.display = 'none';
+                notificationList.innerHTML = '<p style="padding: 16px; text-align: center; color: var(--text-muted);">Nenhuma notificação.</p>';
             }
-
-            const notificationIcons = {
-                'meeting_invite': 'fa-users',
-                'meeting_cancellation': 'fa-calendar-times', 
-                'schedule_assignment': 'fa-calendar-check',
-                'client_assignment': 'fa-user-plus'
-            };
-
-            allUserNotifications.slice(0, 10).forEach(notification => { 
-                const icon = notificationIcons[notification.type] || 'fa-bell';
-                const item = document.createElement('div');
-                item.className = `notification-item ${notification.isRead ? '' : 'unread'}`; 
-                item.innerHTML = `
-                    <div class="notification-item-icon"><i class="fa-solid ${icon}"></i></div>
-                    <div class="notification-item-content">
-                        <h5>${notification.title}</h5>
-                        <p>${notification.message}</p>
-                        <p class="notification-timestamp">${new Date(notification.createdAt).toLocaleString('pt-BR')}</p>
-                    </div>
-                `;
-                notificationList.appendChild(item);
-            });
-
-        } else {
-            notificationCountBadge.style.display = 'none';
-            notificationList.innerHTML = '<p style="padding: 16px; text-align: center; color: var(--text-muted);">Nenhuma notificação.</p>';
+        } catch (error) {
+            console.error('Erro ao carregar notificações:', error);
         }
     }, notificationCheckDelay);
 }
 
 // NEW: Function to mark notifications as read
-function markNotificationsAsRead() {
+// [B4] Marcar notificações como lidas
+async function markNotificationsAsRead() {
     const currentUser = getCurrentUser();
     if (!currentUser) return;
 
-    let madeChanges = false;
-    db.notifications.forEach(n => {
-        if (n.userId === currentUser.id && !n.isRead) {
-            n.isRead = true;
-            madeChanges = true;
+    try {
+        const myNotifications = await fetchMyNotifications();
+        const unreadNotifications = myNotifications.filter(n => !n.is_read);
+        
+        for (const notification of unreadNotifications) {
+            await markNotificationRead(notification.id);
         }
-    });
 
-    if (madeChanges) {
-        saveDb();
         setTimeout(checkNotifications, 300);
+    } catch (error) {
+        console.error('Erro ao marcar notificações como lidas:', error);
     }
 }
 

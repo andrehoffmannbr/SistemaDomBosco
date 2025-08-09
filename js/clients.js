@@ -4,6 +4,7 @@ import { hydrate } from './database.js';
 import { getCurrentUser, isRoleAllowed, DIRECTOR_ONLY, FINANCE_ONLY, DIRECTOR_OR_FINANCE, ALL_ADMIN_VIEW_CLIENTS_AND_EMPLOYEES, PROFESSIONAL_ROLES, COORDINATOR_AND_HIGHER, checkTabAccess } from './auth.js'; // Import new constants
 import { showNotification, updateGlobalSearchDatalist, switchTab } from './ui.js';
 import { formatDuration } from './utils.js'; // Import the new utility function
+import { pushNotification } from './notifications.js';
 
 export function renderClientList(filter = '', activityFilter = 'all', professionalFilter = 'all', unitFilter = 'all') {
     const clientListContainer = document.getElementById('client-list-container');
@@ -1150,18 +1151,18 @@ export function assignProfessionalToClient() { // This function is now for savin
     });
 
     // Send notifications to newly assigned professionals
-    addedProfIds.forEach(profId => {
-        if (!db.notifications) db.notifications = [];
-        db.notifications.push({
-            id: db.nextNotificationId++,
-            userId: profId,
-            type: 'client_assignment',
-            title: 'Novo Paciente Vinculado',
-            message: `Você foi vinculado como profissional responsável pelo paciente: ${client.name}.`,
-            relatedId: client.id,
-            createdAt: new Date().toISOString(),
-            isRead: false
-        });
+    addedProfIds.forEach(async (profId) => {
+        try {
+            await pushNotification({
+                user_id: profId,
+                type: 'client_assignment',
+                title: 'Novo Paciente Vinculado',
+                message: `Você foi vinculado como profissional responsável pelo paciente: ${client.name}.`,
+                related_id: client.id
+            });
+        } catch (error) {
+            console.error('Erro ao enviar notificação:', error);
+        }
     });
 
     // Update client data

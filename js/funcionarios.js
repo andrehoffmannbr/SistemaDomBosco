@@ -1,9 +1,50 @@
 // Employee management module
-import { db, saveDb } from './database.js';
+import { supabase } from '../lib/supabaseClient.js';
+import { db, saveDb, hydrate } from './database.js';
 import { showNotification, updateGlobalSearchDatalist } from './ui.js';
 import { getCurrentUser, isRoleAllowed, ALL_ADMIN_VIEW_CLIENTS_AND_EMPLOYEES, DIRECTOR_ONLY, PROFESSIONAL_ROLES, COORDINATOR_AND_HIGHER, checkTabAccess } from './auth.js'; // Import hasEditAccess
 import { showClientDetails } from './clients.js'; // Import showClientDetails to re-render client modal
 import { formatDuration } from './utils.js'; // Import duration formatting utility
+
+// [B4] NEW: Centralized user profile functions
+// compat: a UI chama "users", mas persistimos em profiles
+export async function listUsers() {
+    try {
+        const { data, error } = await supabase
+            .from('profiles')
+            .select('id, name, role, phone, email, tab_access');
+        if (error) throw error;
+        return (data || []).map(p => ({
+            id: p.id,
+            name: p.name,
+            role: p.role,
+            phone: p.phone,
+            email: p.email,
+            tabAccess: p.tab_access || {}
+        }));
+    } catch (error) {
+        console.error('Error listing users:', error);
+        throw error;
+    }
+}
+
+export async function updateUserProfile(id, patch) {
+    try {
+        const payload = {
+            name: patch.name,
+            role: patch.role,
+            phone: patch.phone,
+            email: patch.email,
+            tab_access: patch.tabAccess
+        };
+        const { error } = await supabase.from('profiles').update(payload).eq('id', id);
+        if (error) throw error;
+        await hydrate('users');
+    } catch (error) {
+        console.error('Error updating user profile:', error);
+        throw error;
+    }
+}
 
 const allSystemTabs = [
     { id: 'cadastro', label: 'Cadastrar Cliente' },

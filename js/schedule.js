@@ -4,6 +4,7 @@ import { hydrate, saveDatabase } from './database.js';
 import { getCurrentUser, isRoleAllowed, PROFESSIONAL_ROLES, COORDINATOR_AND_HIGHER, ALL_SCHEDULE_VIEW_EDIT_MANAGERS, checkTabAccess } from './auth.js'; // Import constants
 import { showNotification } from './ui.js';
 import { showClientDetails } from './clients.js'; // Import showClientDetails to re-render client modal
+import { pushNotification } from './notifications.js';
 
 // Define and export service names for consistent display and use in other modules
 export const serviceNames = {
@@ -363,31 +364,7 @@ export function cancelScheduleWithReason(scheduleId) {
     document.getElementById('modal-cancelar-agendamento').style.display = 'flex';
 }
 
-export async function editSchedule(scheduleId) {
-    const { data: schedules } = await supabase.from('schedules').select('*');
-    const schedule = schedules.find(s => s.id === scheduleId);
-    if (!schedule) return;
-    
-    // Only users with 'edit' permission for the 'agenda' tab can edit schedules.
-    if (!checkTabAccess('agenda', 'edit')) {
-        showNotification('Você não tem permissão para editar agendamentos.', 'error');
-        return;
-    }
-
-    window.currentEditingScheduleId = scheduleId;
-    
-    // Populate edit form - need to populate selects first
-    populateEditClientSelectOptions();
-    populateEditServiceTypeOptions();
-    
-    document.getElementById('edit-cliente-agenda').value = schedule.client_id;
-    document.getElementById('edit-data-agendamento').value = schedule.date;
-    document.getElementById('edit-hora-agendamento').value = schedule.time;
-    document.getElementById('edit-tipo-servico').value = schedule.service_type;
-    document.getElementById('edit-observacoes-agendamento').value = schedule.observations || '';
-    
-    document.getElementById('modal-editar-agendamento').style.display = 'flex';
-}
+// [B2] REMOVED — Duplicate editSchedule function removed, keeping only the canonical version at line 796
 
 function populateEditClientSelectOptions() {
     const select = document.getElementById('edit-cliente-agenda');
@@ -609,7 +586,7 @@ export function reassignSchedule(scheduleId) {
     document.getElementById('modal-reassign-schedule').style.display = 'flex';
 }
 
-export function saveReassignedSchedule() {
+export async function saveReassignedSchedule() {
     const schedule = db.schedules.find(s => s.id === window.currentReassigningScheduleId);
     if (!schedule) {
         showNotification('Erro: Agendamento não encontrado.', 'error');
@@ -635,17 +612,17 @@ export function saveReassignedSchedule() {
 
     // NEW LOGIC: If re-assigning to a different user, create a notification
     if (schedule.assignedToUserId !== newAssignedUserId) {
-        if (!db.notifications) db.notifications = [];
-        db.notifications.push({
-            id: db.nextNotificationId++,
-            userId: newAssignedUserId,
-            type: 'schedule_assignment',
-            title: 'Agendamento Redirecionado',
-            message: `O agendamento do paciente ${client.name} para ${new Date(schedule.date).toLocaleDateString('pt-BR', { timeZone: 'UTC' })} às ${schedule.time} foi redirecionado para você.`,
-            relatedId: schedule.id,
-            createdAt: new Date().toISOString(),
-            isRead: false
-        });
+        try {
+            await pushNotification({
+                user_id: newAssignedUserId,
+                type: 'schedule_assignment',
+                title: 'Agendamento Redirecionado',
+                message: `O agendamento do paciente ${client.name} para ${new Date(schedule.date).toLocaleDateString('pt-BR', { timeZone: 'UTC' })} às ${schedule.time} foi redirecionado para você.`,
+                related_id: schedule.id
+            });
+        } catch (error) {
+            console.error('Erro ao enviar notificação:', error);
+        }
     }
 
     // NEW LOGIC: If assigning to a professional, ADD this professional to the client's assigned professionals list
@@ -722,36 +699,6 @@ export function populateAssignableUsers() {
         // Other roles (e.g., financeiro, staff not in PROFESSIONAL_ROLES) or no access to agenda
         select.innerHTML = '<option value="">Nenhum profissional disponível</option>';
         select.disabled = true;
-    }
-}
-
-// NEW: Confirm attendance function
-export async function confirmAttendance(scheduleId, attendanceData) {
-    if (!checkTabAccess('agenda', 'edit')) {
-        showNotification('Você não tem permissão para confirmar atendimentos.', 'error');
-        return;
-    }
-
-    try {
-        const { error } = await supabase
-            .from('schedules')
-            .update({
-                status: 'confirmado',
-                attendance_notes: attendanceData.notes || '',
-                professional_responsible: attendanceData.professional || '',
-                confirmed_by: (await getUser()).id,
-                confirmed_at: new Date().toISOString()
-            })
-            .eq('id', scheduleId);
-
-        if (error) throw error;
-        await hydrate('schedules');
-
-        showNotification('Atendimento confirmado com sucesso!', 'success');
-        return true;
-    } catch (error) {
-        showNotification('Erro ao confirmar atendimento: ' + error.message, 'error');
-        throw error;
     }
 }
 
@@ -900,6 +847,6 @@ export async function confirmAttendance(attendanceData) {
 
 // Make functions available globally for onclick handlers
 window.cancelScheduleWithReason = cancelScheduleWithReason;
-window.editSchedule = editSchedule;
+// [B2] REMOVED — window.editSchedule = editSchedule; (causes duplicate declaration)
 window.reassignSchedule = reassignSchedule;
 window.saveReassignedSchedule = saveReassignedSchedule;

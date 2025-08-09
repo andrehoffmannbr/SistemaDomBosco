@@ -25,7 +25,8 @@
             <div class="login-form">
                 <!-- New: Login Badge -->
                 <div class="login-badge">
-                    <img src="/assets/login_badge.png" alt="System ID">
+                <!-- [B3] Suppressed broken asset: login_badge.png -->
+                <!-- <img src="/assets/login_badge.png" alt="System ID"> -->
                 </div>
                 <h1>FUNDAÇÃO DOM BOSCO</h1>
                 <p class="login-subtitle">Acesso Restrito</p>
@@ -2047,13 +2048,19 @@
     }
     </script>
     <!-- ENV e Supabase Client (inserido antes dos scripts da app) -->
+    <!-- [B1] START — ENV do Supabase -->
     <script>
+      // Preencha com seus valores reais (ANON KEY, nunca service role)
       window.__ENV = {
-        SUPABASE_URL: 'https://<seu-projeto>.supabase.co',
-        SUPABASE_ANON_KEY: '<sua_anon_key>'
+        SUPABASE_URL: 'https://xyzcompany.supabase.co',
+        SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh5emNvbXBhbnkiLCJyb2xlIjoiYW5vbiIsImlhdCI6MTY0MDk5NTIwMCwiZXhwIjoxOTU2NTcxMjAwfQ.rEJteqm1VTiGjWEPPXh8CZaWJPPH8P8HFz7eY0n6-k0'
       };
     </script>
+    <!-- [B1] END -->
     <script type="module" src="./lib/supabaseClient.js"></script>
+    <!-- Módulos novos, carregados antes de main.js -->
+    <script type="module" src="js/mural.js"></script>
+    <script type="module" src="js/notifications.js"></script>
     <!-- fim bloco inserido -->
     <script type="module" src="js/main.js"></script>
 </body>

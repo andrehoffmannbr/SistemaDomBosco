@@ -1,8 +1,42 @@
 // Financial reporting module
-import { db, saveDb } from './database.js';
+import { supabase, getUser } from '../lib/supabaseClient.js';
+import { db, hydrate } from './database.js';
 import { getCurrentUser, isRoleAllowed, DIRECTOR_OR_FINANCE, DIRECTOR_ONLY } from './auth.js'; // Import isRoleAllowed and new role constant
 import { showNotification } from './ui.js';
 import { serviceNames } from './schedule.js'; // Import serviceNames for detailed reports
+
+// [B4] NEW: Centralized daily notes functions
+export async function addDailyNote(note) {
+    try {
+        const user = await getUser();
+        if (!user) throw new Error('Usuário não autenticado');
+        
+        const payload = { 
+            ...note, 
+            user_id: user.id,
+            date: note.date || new Date().toISOString().split('T')[0],
+            created_at: new Date().toISOString()
+        };
+        
+        const { error } = await supabase.from('daily_notes').insert(payload);
+        if (error) throw error;
+        await hydrate('dailyNotes');
+    } catch (error) {
+        console.error('Error adding daily note:', error);
+        throw error;
+    }
+}
+
+export async function deleteDailyNote(id) {
+    try {
+        const { error } = await supabase.from('daily_notes').delete().eq('id', id);
+        if (error) throw error;
+        await hydrate('dailyNotes');
+    } catch (error) {
+        console.error('Error deleting daily note:', error);
+        throw error;
+    }
+}
 
 export function renderFinancialReport(selectedPeriod = 'current-month') {
     // Only Director and Finance roles can view financial reports
@@ -306,9 +340,9 @@ export function renderDailyNotes(selectedPeriod = 'current-month') {
             'nota': 'Nota'
         };
         
-        const isImage = note.fileName && /\.(jpe?g|png|gif|webp)$/i.test(note.fileName);
+        const isImage = note.file_name && /\.(jpe?g|png|gif|webp)$/i.test(note.file_name);
         const previewButtonHtml = isImage ? `
-             <button class="btn-preview-small" onclick="window.previewFile('${note.title.replace(/'/g, "\\'")}', '${note.fileData}', '${note.fileName.replace(/'/g, "\\'")}')">
+             <button class="btn-preview-small" onclick="window.previewFile('${note.title.replace(/'/g, "\\'")}', '${note.file_data}', '${note.file_name.replace(/'/g, "\\'")}')">
                 <i class="fa-solid fa-eye"></i> Visualizar
             </button>
         ` : '';
@@ -328,16 +362,16 @@ export function renderDailyNotes(selectedPeriod = 'current-month') {
             <div class="note-content">
                 ${note.content}
             </div>
-            ${note.fileName && note.fileData ? `
+            ${note.file_name && note.file_data ? `
                 <div class="note-attachment">
                     ${previewButtonHtml}
-                    <a href="${note.fileData}" download="${note.fileName}" class="btn-download">
-                        <i class="fa-solid fa-download"></i> ${note.fileName}
+                    <a href="${note.file_data}" download="${note.file_name}" class="btn-download">
+                        <i class="fa-solid fa-download"></i> ${note.file_name}
                     </a>
                 </div>
             ` : ''}
             <div class="note-footer">
-                <small>Por ${note.createdBy} em ${new Date(note.createdAt).toLocaleDateString('pt-BR')} às ${new Date(note.createdAt).toLocaleTimeString('pt-BR')}</small>
+                <small>${note.created_at ? `Criado em ${new Date(note.created_at).toLocaleDateString('pt-BR')} às ${new Date(note.created_at).toLocaleTimeString('pt-BR')}` : ''}</small>
                 <button class="btn-delete-note" onclick="deleteDailyNote(${note.id})">
                     <i class="fa-solid fa-trash"></i>
                 </button>
@@ -348,7 +382,8 @@ export function renderDailyNotes(selectedPeriod = 'current-month') {
     });
 }
 
-export function addDailyNote() {
+// [B4] UI WRAPPER - addDailyNote (calls centralized function)
+export async function addDailyNoteUI() {
     // Only Director and Finance roles can add daily notes
     if (!isRoleAllowed(DIRECTOR_OR_FINANCE)) {
         showNotification('Você não tem permissão para adicionar notas diárias financeiras.', 'error');
@@ -373,25 +408,18 @@ export function addDailyNote() {
         return;
     }
     
-    if (!db.dailyNotes) {
-        db.dailyNotes = [];
-    }
-    
-    const newNote = {
-        id: db.nextDailyNoteId++,
-        date: date,
-        title: title,
-        type: type,
-        value: value,
-        content: content,
-        createdAt: new Date().toISOString(),
-        createdBy: getCurrentUser().name
+    // Monta payload conforme schema.daily_notes
+    const basePayload = {
+        date,
+        title,
+        type,                          // 'receita' | 'despesa' | 'nota'
+        value: value ?? null,
+        content,
+        category: type === 'despesa'
+          ? (document.getElementById('daily-note-expense-category')?.value || null)
+          : null
+        // file_name / file_data serão preenchidos abaixo se houver arquivo
     };
-
-    // Add category if it's an expense
-    if (type === 'despesa') {
-        newNote.category = document.getElementById('daily-note-expense-category').value;
-    }
 
     if (fileInput.files[0]) {
         const file = fileInput.files[0];
@@ -403,20 +431,21 @@ export function addDailyNote() {
         }
 
         const reader = new FileReader();
-        reader.onload = function(e) {
-            newNote.fileName = file.name;
-            newNote.fileData = e.target.result;
-            
-            db.dailyNotes.push(newNote);
-            saveDb();
-            
+        reader.onload = async (e) => {
+            const payload = {
+                ...basePayload,
+                file_name: file.name,
+                file_data: e.target.result
+            };
+            await addDailyNote(payload);
+
             document.getElementById('form-add-daily-note').reset();
             document.getElementById('modal-add-daily-note').style.display = 'none';
-            
+
             const selectedPeriod = document.getElementById('financial-period-selector').value;
             renderDailyNotes(selectedPeriod);
             renderFinancialReport(selectedPeriod);
-            
+
             showNotification('Nota diária adicionada com sucesso!', 'success');
         };
 
@@ -426,21 +455,21 @@ export function addDailyNote() {
 
         reader.readAsDataURL(file);
     } else {
-        db.dailyNotes.push(newNote);
-        saveDb();
-        
+        await addDailyNote(basePayload);
+
         document.getElementById('form-add-daily-note').reset();
         document.getElementById('modal-add-daily-note').style.display = 'none';
-        
+
         const selectedPeriod = document.getElementById('financial-period-selector').value;
         renderDailyNotes(selectedPeriod);
         renderFinancialReport(selectedPeriod);
-        
+
         showNotification('Nota diária adicionada com sucesso!', 'success');
     }
 }
 
-export function deleteDailyNote(noteId) {
+// [B4] UI WRAPPER - deleteDailyNote (calls centralized function)
+export async function deleteDailyNoteUI(noteId) {
     // Only Director and Finance roles can delete daily notes
     if (!isRoleAllowed(DIRECTOR_OR_FINANCE)) {
         showNotification('Você não tem permissão para excluir notas diárias financeiras.', 'error');
@@ -449,8 +478,7 @@ export function deleteDailyNote(noteId) {
 
     if (!confirm('Tem certeza que deseja excluir esta nota?')) return;
     
-    db.dailyNotes = db.dailyNotes.filter(note => note.id !== noteId);
-    saveDb();
+    await deleteDailyNote(noteId);
     
     const selectedPeriod = document.getElementById('financial-period-selector').value;
     renderDailyNotes(selectedPeriod);
@@ -878,7 +906,7 @@ export function generateDetailedFinancialReport(selectedPeriod) {
                                 </div>
                                 ${note.value !== null ? `<div class="note-value">R$ ${note.value.toFixed(2).replace('.', ',')}</div>` : ''}
                                 <div class="note-content">${note.content}</div>
-                                ${note.fileName && note.fileData ? `<div class="note-attachment-link"><a href="${note.fileData}" download="${note.fileName}"><i class="fa-solid fa-download"></i> ${note.fileName}</a></div>` : ''}
+                                ${note.file_name && note.file_data ? `<div class="note-attachment-link"><a href="${note.file_data}" download="${note.file_name}"><i class="fa-solid fa-download"></i> ${note.file_name}</a></div>` : ''}
                             </div>
                         `;
                     }).join('')}
@@ -936,7 +964,7 @@ export function downloadDailyNotes(selectedPeriod = 'all') {
         return;
     }
 
-    const headers = ["Data", "Tipo", "Título", "Valor", "Descrição", "Criado Por", "Nome do Arquivo Anexado"];
+    const headers = ["Data", "Tipo", "Título", "Valor", "Descrição", "Nome do Arquivo Anexado"];
     const csvRows = [];
     csvRows.push(headers.join(';')); // Use semicolon as separator for CSV compatibility with Excel
 
@@ -968,8 +996,7 @@ export function downloadDailyNotes(selectedPeriod = 'all') {
             escapeCsv(note.title),
             escapeCsv(valueDisplay),
             escapeCsv(note.content),
-            escapeCsv(note.createdBy),
-            escapeCsv(note.fileName || '')
+            escapeCsv(note.file_name || '')
         ];
         csvRows.push(row.join(';'));
     });
