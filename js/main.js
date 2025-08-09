@@ -136,8 +136,12 @@ function setupMobileGestures() {
 }
 
 // Initialize application
-document.addEventListener('DOMContentLoaded', () => {
-    loadDb();
+document.addEventListener('DOMContentLoaded', async () => {
+    try {
+        await hydrateAll(); // ✅ carrega das tabelas do Supabase
+    } catch (e) {
+        console.error('Falha na hidratação inicial:', e);
+    }
     populateDemoCredentials(); 
     
     if (checkLogin()) {
