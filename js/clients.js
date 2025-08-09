@@ -1,7 +1,7 @@
 // Client management module
 import { supabase, getUser } from '../lib/supabaseClient.js';
 import { hydrate } from './database.js';
-import { getCurrentUser, isRoleAllowed, DIRECTOR_ONLY, FINANCE_ONLY, DIRECTOR_OR_FINANCE, ALL_ADMIN_VIEW_CLIENTS_AND_EMPLOYEES, PROFESSIONAL_ROLES, COORDINATOR_AND_HIGHER, checkTabAccess } from './auth.js'; // Import new constants
+import { getCurrentUser, isUserRoleIn, DIRECTOR_ONLY, FINANCE_ONLY, DIRECTOR_OR_FINANCE, ALL_ADMIN_VIEW_CLIENTS_AND_EMPLOYEES, PROFESSIONAL_ROLES, COORDINATOR_AND_HIGHER, checkTabAccess } from './auth.js'; // Import new constants
 import { showNotification, updateGlobalSearchDatalist, switchTab } from './ui.js';
 import { formatDuration } from './utils.js'; // Import the new utility function
 import { pushNotification } from './notifications.js';
@@ -21,7 +21,7 @@ export function renderClientList(filter = '', activityFilter = 'all', profession
     // Roles like 'director', 'coordinator_madre', 'coordinator_floresta', 'receptionist' are not part of PROFESSIONAL_ROLES,
     // so for them, the `clientsToShow` array will remain `db.clients` (all clients),
     // which aligns with the requirement for 'director' and 'receptionist' to see all patients.
-    if (isRoleAllowed(PROFESSIONAL_ROLES) && !isRoleAllowed(ALL_ADMIN_VIEW_CLIENTS_AND_EMPLOYEES)) {
+    if (isUserRoleIn(PROFESSIONAL_ROLES) && !isUserRoleIn(ALL_ADMIN_VIEW_CLIENTS_AND_EMPLOYEES)) {
         clientsToShow = clientsToShow.filter(client => 
             client.assignedProfessionalIds && client.assignedProfessionalIds.includes(currentUser.id)
         );
@@ -49,7 +49,7 @@ export function renderClientList(filter = '', activityFilter = 'all', profession
     // Apply professional filter based on `assignedProfessionalIds`
     // This filter is only meaningful for roles that can see *all* clients and then filter them,
     // i.e., Director, Coordinators, and Receptionists. For professionals, the initial filtering already handled this.
-    if (!isRoleAllowed(PROFESSIONAL_ROLES) || isRoleAllowed(ALL_ADMIN_VIEW_CLIENTS_AND_EMPLOYEES)) {
+    if (!isUserRoleIn(PROFESSIONAL_ROLES) || isUserRoleIn(ALL_ADMIN_VIEW_CLIENTS_AND_EMPLOYEES)) {
         if (professionalFilter === 'linked') {
             filteredClients = filteredClients.filter(client => 
                 client.assignedProfessionalIds && client.assignedProfessionalIds.length > 0
@@ -244,7 +244,7 @@ export function showClientDetails(clientId) {
     const deleteClientButton = document.getElementById('btn-delete-client');
 
     if (deleteClientButton) {
-        if (checkTabAccess('historico', 'edit') && isRoleAllowed(DIRECTOR_ONLY)) { // Only Director can delete
+        if (checkTabAccess('historico', 'edit') && isUserRoleIn(DIRECTOR_ONLY)) { // Only Director can delete
             deleteClientButton.style.display = 'inline-flex';
         } else {
             deleteClientButton.style.display = 'none';
@@ -475,7 +475,7 @@ export async function addClientNote(clientId, note) {
 // CLIENT DOCUMENTS (base64)
 export async function addClientDocument(clientId, doc) {
     // Check if current user is allowed to add documents
-    if (!(isRoleAllowed(ALL_ADMIN_VIEW_CLIENTS_AND_EMPLOYEES) || isRoleAllowed(PROFESSIONAL_ROLES))) {
+    if (!(isUserRoleIn(ALL_ADMIN_VIEW_CLIENTS_AND_EMPLOYEES) || isUserRoleIn(PROFESSIONAL_ROLES))) {
         showNotification('Você não tem permissão para anexar documentos a clientes.', 'error');
         return;
     }
@@ -504,7 +504,7 @@ export async function addClientDocument(clientId, doc) {
 
 export function deleteClientDocument(documentId) {
     // Only Director and Coordinators can delete client documents
-    if (!isRoleAllowed(COORDINATOR_AND_HIGHER)) {
+    if (!isUserRoleIn(COORDINATOR_AND_HIGHER)) {
         showNotification('Você não tem permissão para excluir documentos de cliente.', 'error');
         return;
     }
@@ -520,7 +520,7 @@ export function deleteClientDocument(documentId) {
 
 export function renderMeusPacientes(filter = '') {
     const currentUser = getCurrentUser();
-    if (!isRoleAllowed(PROFESSIONAL_ROLES)) return; // Ensure only professionals can access this function
+    if (!isUserRoleIn(PROFESSIONAL_ROLES)) return; // Ensure only professionals can access this function
     
     const meusPacientesList = document.getElementById('meus-pacientes-list');
     if (!meusPacientesList) return;

@@ -95,15 +95,13 @@ export function getCurrentUser() {
   catch { return null; }
 }
 
-// New: Role-based access control helper
-export function isRoleAllowed(allowedRoles) {
-    const user = getCurrentUser();
-    if (!user) return false;
-    // allowedRoles can be a single string or an array of strings
-    if (Array.isArray(allowedRoles)) {
-        return allowedRoles.includes(user.role);
-    }
-    return user.role === allowedRoles;
+// NOVO helper: checa se o usuário atual tem uma role específica ou está em uma lista de roles
+export function isUserRoleIn(allowedRoles) {
+  const user = getCurrentUser();
+  if (!user) return false;
+  return Array.isArray(allowedRoles)
+    ? allowedRoles.includes(user.role)
+    : user.role === allowedRoles;
 }
 
 // Admin sempre pode tudo; caso contrário, checa tabAccess. Ação padrão: "view".
@@ -117,7 +115,7 @@ export function checkTabAccess(section, action = 'view') {
   return !!(action in sec ? sec[action] : sec.view);
 }
 
-// Atalho semântica antiga (se a UI já chamava antes)
+// Mantém a assinatura pública esperada pela UI (NÃO REMOVER)
 export function isRoleAllowed(section, action = 'view') {
   return checkTabAccess(section, action);
 }
