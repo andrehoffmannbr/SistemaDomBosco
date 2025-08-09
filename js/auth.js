@@ -103,20 +103,8 @@ export function checkTabAccess(tabId, requiredAccess = 'view', user = getCurrent
         return true; // Edit implies both view and edit are allowed
     }
 
-    // 2. If no custom user override, check for custom role permissions
-    const userRole = db.roles.find(r => r.id === user.role);
-    if (userRole && userRole.tabAccess) {
-        const roleAccessForTab = userRole.tabAccess[tabId];
-        if (roleAccessForTab) { // If there's a setting in the custom role
-            if (requiredAccess === 'view' && (roleAccessForTab === 'view' || roleAccessForTab === 'edit')) {
-                return true;
-            }
-            if (requiredAccess === 'edit' && roleAccessForTab === 'edit') {
-                return true;
-            }
-            return false;
-        }
-    }
+    // 2. Custom role permissions now stored in Supabase profiles.tab_access
+    // For now, skip custom role lookup and go directly to default permissions
 
     // 3. If still no specific permission, fall back to default hardcoded role-based permissions.
     const tabsConfig = {
@@ -152,27 +140,21 @@ export function hasEditAccess(tabId) {
     return checkTabAccess(tabId, 'edit');
 }
 
-// NEW FUNCTION: Update User Password
-export function updateUserPassword(userId, newPassword) {
-    const user = db.users.find(u => u.id === userId);
-    // Only Director can update passwords and only if they have 'edit' access to the 'funcionarios' tab
-    if (user && hasEditAccess('funcionarios')) { 
-        // No need to store old password, only a dummy value in history.
-        user.password = newPassword;
-        
-        // Add to change history
-        if (!user.changeHistory) user.changeHistory = [];
-        user.changeHistory.push({
-            id: db.nextChangeId++,
-            date: new Date().toISOString(),
-            changedBy: getCurrentUser().name,
-            changes: [
-                { field: 'Senha', oldValue: '********', newValue: '********' } // Mask passwords in history
-            ]
-        });
-        
-        // (removido) saveDb(); — persistência é no Supabase
+// NEW FUNCTION: Update User Password (via Supabase)
+export async function updateUserPassword(userId, newPassword) {
+    // Only users with 'edit' access to 'funcionarios' tab can update passwords
+    if (!hasEditAccess('funcionarios')) return false;
+    
+    try {
+        // Use Supabase auth admin API to update password
+        const { error } = await supabase.auth.admin.updateUserById(userId, { password: newPassword });
+        if (error) {
+            console.error('Password update failed:', error);
+            return false;
+        }
         return true;
+    } catch (err) {
+        console.error('Password update error:', err);
+        return false;
     }
-    return false;
 }

@@ -135,41 +135,27 @@ function setupMobileGestures() {
   }, false);
 }
 
-// ===== Boot seguro: não hidratar sem sessão =====
 async function bootApp() {
-    try {
-        const session = await getSession();
-        if (session?.user?.id) {
-            // usuário já logado → hidrata e mostra app
-            await hydrateAll();
-            showMainApp();
-            initializeApp();
-            checkNotifications(); 
-            resetIdleTimer();
-        } else {
-            // não logado → apenas renderiza tela de login, SEM hydrateAll()
-            showLoginScreen();
+    populateDemoCredentials();
+    const session = await getSession();
+    if (session && session.user && session.user.id) {
+        try { 
+            await hydrateAll(); 
+        } catch(e) { 
+            console.error('Falha na hidratação inicial:', e); 
         }
-    } catch (e) {
-        console.error('Falha no boot:', e);
-        showLoginScreen(); // fallback para tela de login em caso de erro
     }
-    
-    populateDemoCredentials(); 
-}
-
-// Initialize application
-document.addEventListener('DOMContentLoaded', () => {
     setupEventListeners();
     setupFormHandlers();
     setupMobileGestures(); 
     setupGlobalSearch(); // NEW: Setup global search
     init(); // [LOGIN-FIX] Initialize login handler with protection
-    bootApp(); // [BOOT-FIX] Boot seguro sem hidratar antes da sessão
     
     // Set up the automatic data refresh
     setInterval(softRefreshData, REFRESH_INTERVAL);
-});
+}
+
+document.addEventListener('DOMContentLoaded', bootApp);
 
 function initializeApp() {
     updateCurrentDate();
@@ -2125,25 +2111,12 @@ function populateNewFuncionarioRoleSelect() {
     });
 }
 
+// Versão segura: não toca em db; só evita campos vazios se quiser placeholder
 function populateDemoCredentials() {
-    // Versão simples, sem tocar em db (evita 'db is not defined' na tela de login)
-    const demoList = document.getElementById('demo-credentials-list');
-    if (!demoList) return;
-
-    // Limpar e esconder a área demo por padrão
-    demoList.innerHTML = ''; 
-    const demoContainer = document.querySelector('.demo-credentials');
-    if (demoContainer) {
-        demoContainer.style.display = 'none';
-    }
-
-    // Opcional: se quiser mostrar credenciais estáticas, descomente abaixo
-    /*
-    const li = document.createElement('li');
-    li.innerHTML = `<strong>Admin:</strong> admin@empresa.com / senha123`;
-    demoList.appendChild(li);
-    if (demoContainer) demoContainer.style.display = 'block';
-    */
+    const emailInput = document.getElementById('username');
+    const passInput = document.getElementById('password');
+    if (!emailInput || !passInput) return;
+    // opcional: manter em branco; não auto-preencher em produção
 }
 
 // NEW: Soft refresh function to update data without a full page reload
