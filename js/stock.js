@@ -451,7 +451,7 @@ export async function addStockItem(item) {
         const user = await getUser();
         if (!user) throw new Error('Usuário não autenticado');
 
-        const newItem = {
+        const payload = {
             name: item.name,
             category: item.category,
             quantity: item.quantity || 0,
@@ -459,20 +459,25 @@ export async function addStockItem(item) {
             unit: item.unit || 'unidade',
             unit_value: item.unitValue || item.unit_value || 0,
             description: item.description || '',
-            user_id: user.id,
-            created_by: user.id
+            user_id: user.id
         };
+
+        // Verifica se a coluna 'created_by' existe no schema antes de adicionar
+        // Isto evita o erro "Could not find the 'created_by' column" em ambientes sem essa coluna
+        if (db?.stockItems && db.stockItems.length > 0 && 'created_by' in db.stockItems[0]) {
+            payload.created_by = user.id;
+        }
 
         const { data: stockItem, error: stockError } = await supabase
             .from('stock_items')
-            .insert([newItem])
+            .insert([payload])
             .select()
             .single();
         
         if (stockError) throw stockError;
 
         // If quantity > 0, create initial stock movement
-        if (newItem.quantity > 0) {
+        if (payload.quantity > 0) {
             const movement = {
                 item_id: stockItem.id,
                 item_name: stockItem.name,
