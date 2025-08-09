@@ -39,11 +39,37 @@ export async function login(username, password) {
   if (error) return { ok: false, error };
   const user = await getUser();
   if (!user) return { ok: false, error: new Error('Sessão inválida') };
-  const { data: profile, error: pErr } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+  
+  // Carrega perfil
+  const { data: profile, error: pErr } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', user.id)
+    .single();
   if (pErr) return { ok: false, error: pErr };
+
+  // Fallback de tab_access:
+  // - Se profile.tab_access está vazio/{} → buscar do papel em roles.tab_access
+  // - Admin sempre tem tudo liberado
+  let effectiveTabAccess = profile.tab_access || {};
+  const isEmpty =
+    !effectiveTabAccess ||
+    (typeof effectiveTabAccess === 'object' && Object.keys(effectiveTabAccess).length === 0);
+
+  if (isEmpty) {
+    const { data: roleRow } = await supabase
+      .from('roles')
+      .select('tab_access')
+      .eq('id', profile.role)
+      .single();
+    effectiveTabAccess = roleRow?.tab_access || {};
+    // Persiste para não perder mais após novo login
+    await supabase.from('profiles').update({ tab_access: effectiveTabAccess }).eq('id', user.id);
+  }
+
   const currentUser = {
     id: profile.id, name: profile.name, role: profile.role,
-    email: profile.email, phone: profile.phone, tabAccess: profile.tab_access || {}
+    email: profile.email, phone: profile.phone, tabAccess: effectiveTabAccess
   };
   localStorage.setItem('currentUser', JSON.stringify(currentUser));
   await hydrateAll();
@@ -80,59 +106,20 @@ export function isRoleAllowed(allowedRoles) {
     return user.role === allowedRoles;
 }
 
-export function checkTabAccess(tabId, requiredAccess = 'view', user = getCurrentUser()) {
-    if (!user) return false;
+// Admin sempre pode tudo; caso contrário, checa tabAccess. Ação padrão: "view".
+export function checkTabAccess(section, action = 'view') {
+  const u = getCurrentUser();
+  if (!u) return false;
+  if (u.role === 'admin') return true;
+  const ta = u.tabAccess || {};
+  const sec = ta[section];
+  if (!sec) return false;
+  return !!(action in sec ? sec[action] : sec.view);
+}
 
-    let effectiveAccessLevel = null; // Can be 'none', 'view', 'edit' from custom settings, or null if no custom setting for this tab.
-
-    // 1. Check for user-specific custom permissions first
-    // If user.tabAccess is an object, check if it contains a specific override for this tabId.
-    if (user.tabAccess && typeof user.tabAccess === 'object') {
-        const customAccessForTab = user.tabAccess[tabId];
-        if (customAccessForTab !== undefined) { // If there's an explicit custom setting for this tab (can be 'none', 'view', 'edit')
-            effectiveAccessLevel = customAccessForTab;
-        }
-    }
-
-    // Now, evaluate the determined `effectiveAccessLevel`
-    if (effectiveAccessLevel === 'none') {
-        return false; // Explicitly denied by custom permission
-    } else if (effectiveAccessLevel === 'view') {
-        return requiredAccess === 'view'; // Only view is allowed
-    } else if (effectiveAccessLevel === 'edit') {
-        return true; // Edit implies both view and edit are allowed
-    }
-
-    // 2. Custom role permissions now stored in Supabase profiles.tab_access
-    // For now, skip custom role lookup and go directly to default permissions
-
-    // 3. If still no specific permission, fall back to default hardcoded role-based permissions.
-    const tabsConfig = {
-        'cadastro': NON_FINANCE_ACCESS,
-        'agenda': NON_FINANCE_ACCESS,
-        'historico': ALL_ADMIN_VIEW_CLIENTS_AND_EMPLOYEES,
-        'meus-pacientes': DIRECTOR_AND_PROFESSIONALS,
-        'financeiro': DIRECTOR_OR_FINANCE,
-        'relatorios': ALL_ADMIN_VIEW_CLIENTS_AND_EMPLOYEES,
-        'estoque': STOCK_MANAGERS,
-        'funcionarios': ALL_ADMIN_VIEW_CLIENTS_AND_EMPLOYEES,
-        'documentos': ALL_USERS, 
-    };
-
-    const editAccessConfig = {
-        'documentos': DIRECTOR_AND_COORDINATORS_ONLY_DOCUMENTS,
-    };
-
-    const defaultRolesForTab = tabsConfig[tabId] || [];
-    const hasDefaultAccess = isRoleAllowed(defaultRolesForTab); // This uses the current user's role unless `user` is passed
-
-    if (requiredAccess === 'view') {
-        return hasDefaultAccess;
-    } else if (requiredAccess === 'edit') {
-        const editRolesForTab = editAccessConfig[tabId] || defaultRolesForTab; // Fallback to view roles if no specific edit config
-        return isRoleAllowed(editRolesForTab);
-    }
-    return false; // Should not reach here for valid requiredAccess values.
+// Atalho semântica antiga (se a UI já chamava antes)
+export function isRoleAllowed(section, action = 'view') {
+  return checkTabAccess(section, action);
 }
 
 export function hasEditAccess(tabId) {

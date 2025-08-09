@@ -162,6 +162,9 @@ function initializeApp() {
     initializeCalendar();
     initScheduleView(); // Initialize agenda view, including the professional filter
     
+    // Renderiza o menu com permissões adequadas
+    renderMenu();
+    
     const currentUser = getCurrentUser();
     
     // Determine initial tab based on user permissions
@@ -215,6 +218,26 @@ function initializeApp() {
             }
         }
     }
+}
+
+// Exemplo robusto de renderização de abas com fallback de admin
+function renderMenu() {
+  const tabs = [
+    ['cadastro',        '[data-tab="cadastro"]'],
+    ['agenda',          '[data-tab="agenda"]'],
+    ['historico',       '[data-tab="historico"]'],
+    ['meus-pacientes',  '[data-tab="meus-pacientes"]'],
+    ['financeiro',      '[data-tab="financeiro"]'],
+    ['relatorios',      '[data-tab="relatorios"]'],
+    ['estoque',         '[data-tab="estoque"]'],
+    ['funcionarios',    '[data-tab="funcionarios"]'],
+    ['documentos',      '[data-tab="documentos"]'],
+  ];
+  tabs.forEach(([section, sel]) => {
+    const el = document.querySelector(sel);
+    if (!el) return;
+    el.style.display = checkTabAccess(section, 'view') ? '' : 'none';
+  });
 }
 
 // NEW: Setup for the global search
