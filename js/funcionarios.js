@@ -1,6 +1,6 @@
 // Employee management module
 import { supabase } from '../lib/supabaseClient.js';
-import { db, saveDb, hydrate } from './database.js';
+import { db, hydrate } from './database.js';
 import { showNotification, updateGlobalSearchDatalist } from './ui.js';
 import { getCurrentUser, isRoleAllowed, ALL_ADMIN_VIEW_CLIENTS_AND_EMPLOYEES, DIRECTOR_ONLY, PROFESSIONAL_ROLES, COORDINATOR_AND_HIGHER, checkTabAccess } from './auth.js'; // Import hasEditAccess
 import { showClientDetails } from './clients.js'; // Import showClientDetails to re-render client modal
@@ -333,7 +333,7 @@ export function saveUserPermissions(userId) {
         });
         
         user.tabAccess = hasCustomAccess ? newTabAccess : null;
-        saveDb();
+        // (removido) saveDb(); — as funções canônicas já usam Supabase + hydrate('users')
         showNotification(`Permissões de ${user.name} atualizadas com sucesso!`, 'success');
         renderFuncionarioList();
     } else {
@@ -717,7 +717,7 @@ export function saveFuncionarioChanges() {
             changes: changes
         });
         
-        saveDb();
+        // (removido) saveDb()
         document.getElementById('modal-editar-funcionario').style.display = 'none';
         showFuncionarioDetails(window.currentFuncionarioId);
         renderFuncionarioList(); // Re-render the list to reflect changes (e.g., if roles change)
@@ -777,7 +777,7 @@ export function deleteFuncionario(funcionarioId) {
         }
     });
 
-    saveDb();
+    // (removido) saveDb()
     document.getElementById('modal-detalhes-funcionario').style.display = 'none';
     renderFuncionarioList();
     showNotification(`Funcionário "${funcionarioName}" excluído com sucesso!`, 'success');
@@ -811,7 +811,7 @@ export function addFuncionario(funcionarioData) {
     };
     
     db.users.push(newUser);
-    saveDb();
+    // (removido) saveDb()
     showNotification(`Funcionário "${funcionarioData.name}" cadastrado com sucesso!`, 'success');
     return true;
 }
@@ -884,7 +884,7 @@ export function populateTabPermissions(containerId, currentPermissions = {}, dis
 export function deleteRole(roleId) {
     db.roles = db.roles.filter(r => r.id !== roleId);
     // Note: This doesn't reassign users. An admin would need to manually edit them.
-    saveDb();
+    // (removido) saveDb()
     initRolesManagement(); // Re-render the roles list
     renderFuncionarioList(); // Re-render employee list to update roles
     showNotification('Cargo excluído com sucesso.', 'success');
@@ -1025,7 +1025,7 @@ export function initRolesManagement() {
             showNotification(`Cargo "${roleName}" criado com sucesso.`, 'success');
         }
         
-        saveDb();
+        // (removido) saveDb()
         renderRolesList();
         hideEditor();
         renderFuncionarioList(); // To update role displays if names changed

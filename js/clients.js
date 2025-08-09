@@ -513,7 +513,7 @@ export function deleteClientDocument(documentId) {
     if (!client || !client.documents) return;
 
     client.documents = client.documents.filter(doc => doc.id !== documentId);
-    saveDb();
+    // (removido) saveDb(); — persistência é no Supabase; UI atualiza por hydrate('clients')
     showClientDetails(window.currentClientId);
     showNotification('Documento excluído com sucesso!', 'success');
 }
@@ -1168,7 +1168,7 @@ export function assignProfessionalToClient() { // This function is now for savin
     // Update client data
     client.assignedProfessionalIds = newAssignedIds;
 
-    saveDb();
+    // (removido) saveDb(); — persistência é no Supabase; UI atualiza por hydrate('clients')
     document.getElementById('modal-assign-professional').style.display = 'none';
     showClientDetails(clientId); // Refresh client details
     renderClientList(); // Refresh client list to show updated count

@@ -1,5 +1,5 @@
 // Form handling module
-import { db, saveDb } from './database.js';
+import { db, hydrate } from './database.js';
 import { renderClientList } from './clients.js';
 import { switchTab, showNotification, updateGlobalSearchDatalist } from './ui.js';
 import { getCurrentUser } from './auth.js';
@@ -523,7 +523,7 @@ function saveClientChanges() {
             changes: changes
         });
         
-        saveDb();
+        // (removido) saveDb()
         document.getElementById('modal-editar-cliente').style.display = 'none';
         showClientDetails(window.currentClientId);
         showNotification('Dados do cliente atualizados com sucesso!', 'success');

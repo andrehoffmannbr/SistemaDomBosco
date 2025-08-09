@@ -1,6 +1,6 @@
 // Main application entry point
 import { supabase, getUser } from '../lib/supabaseClient.js';
-import { hydrateAll, hydrate, saveDatabase } from './database.js';
+import { hydrateAll, hydrate } from './database.js';
 import { login, logout, checkLogin, getCurrentUser, isRoleAllowed, DIRECTOR_ONLY, FINANCE_ONLY, DIRECTOR_OR_FINANCE, STOCK_MANAGERS, ALL_USERS, PROFESSIONAL_ROLES, COORDINATOR_AND_HIGHER, NON_FINANCE_ACCESS, ALL_ADMIN_VIEW_CLIENTS_AND_EMPLOYEES, DIRECTOR_AND_PROFESSIONALS, DIRECTOR_AND_COORDINATORS_ONLY_DOCUMENTS, checkTabAccess } from './auth.js'; 
 import { showLoginScreen, showMainApp, switchTab, updateCurrentDate, showNotification, updateGlobalSearchDatalist } from './ui.js'; 
 import { renderClientList, showClientDetails, addClientNote, addClientDocument, deleteClientDocument, renderMeusPacientes, renderClientReport, showAssignProfessionalModal, assignProfessionalToClient, unassignProfessionalFromClient, deleteClient, duplicateClient, showEmployeeReport, showClientReportModal, generateClientReport } from './clients.js'; 
@@ -153,6 +153,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setupFormHandlers();
     setupMobileGestures(); 
     setupGlobalSearch(); // NEW: Setup global search
+    init(); // [LOGIN-FIX] Initialize login handler with protection
     
     // Set up the automatic data refresh
     setInterval(softRefreshData, REFRESH_INTERVAL);
@@ -282,19 +283,25 @@ function setupEventListeners() {
     document.addEventListener('scroll', resetIdleTimer);
     // --- End Inactivity Logout Event Listeners ---
 
-    document.getElementById('form-login').addEventListener('submit', (e) => {
+    document.getElementById('form-login').addEventListener('submit', async (e) => {
         e.preventDefault();
         const username = document.getElementById('username').value;
         const password = document.getElementById('password').value;
         
-        if (login(username, password)) {
-            document.getElementById('form-login').reset();
-            showMainApp();
-            initializeApp();
-            checkNotifications(); 
-            resetIdleTimer(); // Start idle timer on successful login
-        } else {
-            showNotification('Usuário ou senha inválidos!', 'error');
+        try {
+            const result = await login(username, password);
+            if (result && result.user) {
+                document.getElementById('form-login').reset();
+                showMainApp();
+                initializeApp();
+                checkNotifications(); 
+                resetIdleTimer(); // Start idle timer on successful login
+            } else {
+                showNotification('Usuário ou senha inválidos!', 'error');
+            }
+        } catch (error) {
+            console.error('Erro no login:', error);
+            showNotification('Erro ao tentar fazer login. Tente novamente.', 'error');
         }
     });
 
@@ -1055,6 +1062,43 @@ function setupEventListeners() {
     });
 }
 
+// [LOGIN-FIX] Função init para proteger contra dupla ligação do form de login
+async function init() {
+    // bind de submit (sem reload) e chamada do auth com proteção contra dupla ligação
+    const form = document.getElementById('form-login');
+    const usernameInput = document.getElementById('username');
+    const passInput = document.getElementById('password');
+
+    if (form && usernameInput && passInput && !form.dataset.bound) {
+        // Remove listener existente se houver e adiciona um novo
+        const existingHandlers = form.cloneNode(true);
+        form.parentNode.replaceChild(existingHandlers, form);
+        
+        document.getElementById('form-login').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const username = document.getElementById('username').value?.trim() || '';
+            const password = document.getElementById('password').value || '';
+            
+            try {
+                const result = await login(username, password);
+                if (result && result.user) {
+                    document.getElementById('form-login').reset();
+                    showMainApp();
+                    initializeApp();
+                    checkNotifications(); 
+                    resetIdleTimer();
+                } else {
+                    showNotification('Usuário ou senha inválidos!', 'error');
+                }
+            } catch (error) {
+                console.error('Erro no login:', error);
+                showNotification('Erro ao tentar fazer login. Tente novamente.', 'error');
+            }
+        });
+        document.getElementById('form-login').dataset.bound = '1';
+    }
+}
+
 function populateClientSelect() {
     const select = document.getElementById('select-cliente-agenda');
     select.innerHTML = '<option value="">Selecione um cliente</option>';
@@ -1284,7 +1328,7 @@ function saveNewAttendance() {
                 filesProcessed++;
                 if (filesProcessed === attachments.length) {
                     client.appointments.push(newAppointment);
-                    saveDb();
+                    // (removido) saveDb()
                     
                     document.getElementById('form-novo-atendimento').reset();
                     document.getElementById('modal-novo-atendimento').style.display = 'none';
@@ -1298,7 +1342,7 @@ function saveNewAttendance() {
     } else {
         // No attachments, save directly
         client.appointments.push(newAppointment);
-        saveDb();
+        // (removido) saveDb()
         
         document.getElementById('form-novo-atendimento').reset();
         document.getElementById('modal-novo-atendimento').style.display = 'none';
@@ -1331,7 +1375,7 @@ function saveCancellation() {
             schedule.cancelImage = e.target.result;
             schedule.cancelImageName = imageFile.name;
             
-            saveDb();
+            // (removido) saveDb()
             document.getElementById('form-cancelar-agendamento').reset();
             document.getElementById('preview-imagem-cancelamento').style.display = 'none';
             document.getElementById('modal-cancelar-agendamento').style.display = 'none';
@@ -1341,7 +1385,7 @@ function saveCancellation() {
         };
         reader.readAsDataURL(imageFile);
     } else {
-        saveDb();
+        // (removido) saveDb()
         document.getElementById('form-cancelar-agendamento').reset();
         document.getElementById('modal-cancelar-agendamento').style.display = 'none';
         renderSchedule(document.getElementById('date-selector').value);
@@ -1475,7 +1519,7 @@ function saveAttendanceConfirmation() {
         schedule.confirmedAt = new Date().toISOString();
         schedule.attendanceId = newAppointment.id;
 
-        saveDb();
+        // (removido) saveDb()
         
         document.getElementById('form-confirmar-atendimento').reset();
         document.getElementById('modal-confirmar-atendimento').style.display = 'none';
@@ -1644,7 +1688,7 @@ function processStockAdjustment() {
         purchaseFileName: null
     });
     
-    saveDb();
+    // (removido) saveDb()
     
     document.getElementById('modal-adjust-stock').style.display = 'none';
     renderStockList();

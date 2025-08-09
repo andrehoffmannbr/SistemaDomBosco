@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## [2025-08-09 19:15] — Hotfix: Login Deploy (Vercel estático)
+- index.html: window.__ENV com valores reais do Supabase (URL/ANON_KEY) — corrige login em produção
+- js/main.js: login handler com async/await + proteção contra dupla ligação — corrige reload de página
+- Limpeza completa: removidas todas as chamadas saveDb()/saveDatabase() em todos os módulos
+- js/schedule.js: removido import inválido de saveDatabase — corrige boot error
+- main.js: removida função local duplicada addStockItem — usa apenas stock.js canônico
+- Deploy preparado para Vercel: ENV injetado, módulos ordenados, console limpo
+
 ## [2025-08-09 17:45] — Hotfix: Console Clean
 - index.html: valores reais injetados em window.__ENV (Supabase URL/KEY) — corrige "Invalid URL"
 - js/schedule.js: removida duplicata editSchedule; mantido export canônico com 2 parâmetros — corrige "already been declared"

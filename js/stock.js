@@ -1,6 +1,6 @@
 // Stock management module
 import { supabase, getUser } from '../lib/supabaseClient.js';
-import { hydrate, saveDatabase } from './database.js';
+import { hydrate } from './database.js';
 import { getCurrentUser, isRoleAllowed, DIRECTOR_ONLY, STOCK_MANAGERS } from './auth.js';
 
 export function renderStockList() {

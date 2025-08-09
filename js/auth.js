@@ -171,7 +171,7 @@ export function updateUserPassword(userId, newPassword) {
             ]
         });
         
-        saveDb();
+        // (removido) saveDb(); — persistência é no Supabase
         return true;
     }
     return false;

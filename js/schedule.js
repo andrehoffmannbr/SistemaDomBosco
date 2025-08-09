@@ -1,6 +1,6 @@
 // Schedule management module
 import { supabase, getUser } from '../lib/supabaseClient.js';
-import { hydrate, saveDatabase } from './database.js';
+import { hydrate } from './database.js';
 import { getCurrentUser, isRoleAllowed, PROFESSIONAL_ROLES, COORDINATOR_AND_HIGHER, ALL_SCHEDULE_VIEW_EDIT_MANAGERS, checkTabAccess } from './auth.js'; // Import constants
 import { showNotification } from './ui.js';
 import { showClientDetails } from './clients.js'; // Import showClientDetails to re-render client modal
@@ -332,7 +332,7 @@ export async function updateScheduleStatus(scheduleId, newStatus) {
             // General status update (e.g., if we had other statuses to set directly)
             // This path would only be taken if canConfirm is true.
             schedule.status = newStatus;
-            saveDb();
+            // (removido) saveDb()
             renderSchedule(document.getElementById('date-selector').value);
             showNotification(`Status do agendamento atualizado para ${newStatus}.`, 'success');
         }
@@ -657,7 +657,7 @@ export async function saveReassignedSchedule() {
     schedule.assignedToUserId = newAssignedUserId;
     schedule.assignedToUserName = newAssignedUser.name;
 
-    saveDb();
+    // (removido) saveDb()
     document.getElementById('modal-reassign-schedule').style.display = 'none';
     renderSchedule(document.getElementById('date-selector').value);
     // If the client details modal is open (e.g., reassigning from there), refresh it
