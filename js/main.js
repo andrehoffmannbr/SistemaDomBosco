@@ -1,5 +1,5 @@
 // Main application entry point
-import { supabase, getUser } from '../lib/supabaseClient.js';
+import { supabase, getUser, getSession } from '../lib/supabaseClient.js';
 import { hydrateAll, hydrate } from './database.js';
 import { login, logout, checkLogin, getCurrentUser, isRoleAllowed, DIRECTOR_ONLY, FINANCE_ONLY, DIRECTOR_OR_FINANCE, STOCK_MANAGERS, ALL_USERS, PROFESSIONAL_ROLES, COORDINATOR_AND_HIGHER, NON_FINANCE_ACCESS, ALL_ADMIN_VIEW_CLIENTS_AND_EMPLOYEES, DIRECTOR_AND_PROFESSIONALS, DIRECTOR_AND_COORDINATORS_ONLY_DOCUMENTS, checkTabAccess } from './auth.js'; 
 import { showLoginScreen, showMainApp, switchTab, updateCurrentDate, showNotification, updateGlobalSearchDatalist } from './ui.js'; 
@@ -135,29 +135,37 @@ function setupMobileGestures() {
   }, false);
 }
 
-// Initialize application
-document.addEventListener('DOMContentLoaded', async () => {
+// ===== Boot seguro: não hidratar sem sessão =====
+async function bootApp() {
     try {
-        await hydrateAll(); // ✅ carrega das tabelas do Supabase
+        const session = await getSession();
+        if (session?.user?.id) {
+            // usuário já logado → hidrata e mostra app
+            await hydrateAll();
+            showMainApp();
+            initializeApp();
+            checkNotifications(); 
+            resetIdleTimer();
+        } else {
+            // não logado → apenas renderiza tela de login, SEM hydrateAll()
+            showLoginScreen();
+        }
     } catch (e) {
-        console.error('Falha na hidratação inicial:', e);
+        console.error('Falha no boot:', e);
+        showLoginScreen(); // fallback para tela de login em caso de erro
     }
+    
     populateDemoCredentials(); 
-    
-    if (checkLogin()) {
-        showMainApp();
-        initializeApp();
-        checkNotifications(); 
-        resetIdleTimer(); // Start idle timer on initial load if logged in
-    } else {
-        showLoginScreen();
-    }
-    
+}
+
+// Initialize application
+document.addEventListener('DOMContentLoaded', () => {
     setupEventListeners();
     setupFormHandlers();
     setupMobileGestures(); 
     setupGlobalSearch(); // NEW: Setup global search
     init(); // [LOGIN-FIX] Initialize login handler with protection
+    bootApp(); // [BOOT-FIX] Boot seguro sem hidratar antes da sessão
     
     // Set up the automatic data refresh
     setInterval(softRefreshData, REFRESH_INTERVAL);
@@ -2118,45 +2126,24 @@ function populateNewFuncionarioRoleSelect() {
 }
 
 function populateDemoCredentials() {
+    // Versão simples, sem tocar em db (evita 'db is not defined' na tela de login)
     const demoList = document.getElementById('demo-credentials-list');
     if (!demoList) return;
 
+    // Limpar e esconder a área demo por padrão
     demoList.innerHTML = ''; 
+    const demoContainer = document.querySelector('.demo-credentials');
+    if (demoContainer) {
+        demoContainer.style.display = 'none';
+    }
 
-    const roleMap = {
-        'director': 'Diretoria (Acesso Total)',
-        'financeiro': 'Financeiro',
-        'coordinator_madre': 'Coord. Madre',
-        'coordinator_floresta': 'Coord. Floresta',
-        'staff': 'Funcionário(a) Geral',
-        'receptionist': 'Recepcionista',
-        'psychologist': 'Psicólogo(a)',
-        'psychopedagogue': 'Psicopedagogo(a)',
-        'musictherapist': 'Musicoterapeuta',
-        'speech_therapist': 'Fonoaudiólogo(a)',
-        'nutritionist': 'Nutricionista',
-        'physiotherapist': 'Fisioterapeuta',
-        'intern': 'Estagiário(a)'
-    };
-
-    // Filter out entries that are explicitly null or empty
-    const filteredUsersForDemo = db.users.filter(user => user.username && user.password);
-
-    const sortedUsers = [...filteredUsersForDemo].sort((a, b) => {
-        const roleA = roleMap[a.role] || a.role; // Use original role or raw if custom
-        const roleB = roleMap[b.role] || b.role; // Use original role or raw if custom
-        if (roleA < roleB) return -1;
-        if (roleA > roleB) return 1;
-        return a.name.localeCompare(b.name);
-    });
-
-    sortedUsers.forEach(user => {
-        const li = document.createElement('li');
-        // Display mapped role or just the raw role if it's a custom one
-        const roleText = roleMap[user.role] || user.role; 
-        li.innerHTML = `<strong>${roleText}:</strong> ${user.username} / ${user.password}`;
-        demoList.appendChild(li);
-    });
+    // Opcional: se quiser mostrar credenciais estáticas, descomente abaixo
+    /*
+    const li = document.createElement('li');
+    li.innerHTML = `<strong>Admin:</strong> admin@empresa.com / senha123`;
+    demoList.appendChild(li);
+    if (demoContainer) demoContainer.style.display = 'block';
+    */
 }
 
 // NEW: Soft refresh function to update data without a full page reload

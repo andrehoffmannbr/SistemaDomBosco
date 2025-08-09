@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## [2025-08-09 20:30] — Hotfix: RLS + Boot Seguro (produção estável)
+- SQL: função public.is_admin(uuid) criada para quebrar recursão RLS infinita
+- SQL: todas as políticas reescritas usando is_admin(auth.uid()) - corrige erro 42P17
+- js/main.js: bootApp() implementado - só hidrata com sessão válida, evita 500s no boot
+- js/main.js: populateDemoCredentials() sem db.* - corrige "db is not defined" na tela de login
+- js/auth.js: hydrateAll() mantido apenas após login bem-sucedido
+- fix-rls-recursion.sql: script completo gerado para aplicar no Supabase
+- Console limpo: sem RLS recursion, sem hidratação prematura, boot condicional por sessão
+
 ## [2025-08-09 19:15] — Hotfix: Login Deploy (Vercel estático)
 - index.html: window.__ENV com valores reais do Supabase (URL/ANON_KEY) — corrige login em produção
 - js/main.js: login handler com async/await + proteção contra dupla ligação — corrige reload de página
