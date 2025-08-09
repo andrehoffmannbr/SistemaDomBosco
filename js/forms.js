@@ -1,6 +1,6 @@
 // Form handling module
 import { db, hydrate } from './database.js';
-import { renderClientList } from './clients.js';
+import { renderClientList, addClient } from './clients.js';
 import { switchTab, showNotification, updateGlobalSearchDatalist } from './ui.js';
 import { getCurrentUser } from './auth.js';
 

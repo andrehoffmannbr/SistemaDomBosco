@@ -1,6 +1,6 @@
 // Schedule management module
 import { supabase, getUser } from '../lib/supabaseClient.js';
-import { hydrate } from './database.js';
+import { hydrate, db } from './database.js';
 import { getCurrentUser, isRoleAllowed, PROFESSIONAL_ROLES, COORDINATOR_AND_HIGHER, ALL_SCHEDULE_VIEW_EDIT_MANAGERS, checkTabAccess } from './auth.js'; // Import constants
 import { showNotification } from './ui.js';
 import { showClientDetails } from './clients.js'; // Import showClientDetails to re-render client modal

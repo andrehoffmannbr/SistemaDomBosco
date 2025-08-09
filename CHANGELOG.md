@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## [2025-08-09 22:45] — Regressão final (Supabase + RLS)
+- Login handler corrigido (toast só em falha)
+- Boot seguro com getSession + hydrateAll condicional
+- Removidos contadores/mutações locais remanescentes
+- Confirmado: zero `process.env`/`SERVICE_ROLE` no front
+- Smoke test OK (auth/rest endpoints 200/201)
+- Appointments: suporte explícito no database.js + hydrate automático
+- Main.js: mutações db.next* e db.*.push totalmente eliminadas
+- Network: todas operações via funções canônicas Supabase
+
 ## [2025-08-09 20:30] — Hotfix: RLS + Boot Seguro (produção estável)
 - SQL: função public.is_admin(uuid) criada para quebrar recursão RLS infinita
 - SQL: todas as políticas reescritas usando is_admin(auth.uid()) - corrige erro 42P17
