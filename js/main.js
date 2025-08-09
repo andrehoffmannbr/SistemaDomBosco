@@ -32,29 +32,6 @@ function logoutUser() {
     showNotification('Você foi desconectado(a) devido à inatividade.', 'info', 'Inatividade', 7000);
 }
 
-// [B4] Teste temporário - criar notificação
-window.testNotification = async () => {
-    const currentUser = getCurrentUser();
-    if (!currentUser) {
-        console.log('Usuário não logado');
-        return;
-    }
-    
-    try {
-        await pushNotification({
-            user_id: currentUser.id,
-            type: 'info',
-            title: 'Teste de Notificação',
-            message: 'Esta é uma notificação de teste do sistema.'
-        });
-        showNotification('Notificação de teste criada com sucesso!', 'success');
-        await checkNotifications();
-    } catch (error) {
-        console.error('Erro ao criar notificação de teste:', error);
-        showNotification('Erro ao criar notificação: ' + error.message, 'error');
-    }
-};
-
 // Make necessary functions globally available for onclicks or direct access
 window.showClientDetails = showClientDetails;
 window.updateScheduleStatus = updateScheduleStatus;
@@ -659,7 +636,7 @@ function setupEventListeners() {
 
     document.getElementById('form-add-stock').addEventListener('submit', (e) => {
         e.preventDefault();
-        addStockItem();
+        handleAddStockItem();
     });
 
     document.getElementById('form-adjust-stock').addEventListener('submit', (e) => {
@@ -1551,8 +1528,8 @@ function addMaterialSelection(modalType = 'default') {
     container.appendChild(selectionDiv);
 }
 
-// [B4] WRAPPER — addStockItem (delegates to stock.js)
-async function addStockItem() {
+// [B4] WRAPPER — handleAddStockItem (delegates to stock.js)
+async function handleAddStockItem() {
     if (!checkTabAccess('estoque', 'edit')) { 
         showNotification('Você não tem permissão para adicionar itens ao estoque.', 'error'); 
         return; 
