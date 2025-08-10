@@ -101,27 +101,46 @@ serve(async (req: Request) => {
 
       // Criar cliente com token do usuário  
       const token = authHeader.replace('Bearer ', '');
+      console.log('[DEBUG] Token recebido (primeiros 50 chars):', token.substring(0, 50) + '...');
+      
       const supabaseUser = createClient(EDGE_SUPABASE_URL, EDGE_ANON_KEY);
       
       // Verificar se o token é válido
+      console.log('[DEBUG] Validando token com Supabase...');
       const { data: { user }, error: userError } = await supabaseUser.auth.getUser(token);
-      if (userError || !user) {
-        throw new Error('Invalid authentication token');
+      
+      if (userError) {
+        console.error('[DEBUG] Erro na validação do token:', userError);
+        throw new Error(`Invalid authentication token: ${userError.message}`);
       }
+      
+      if (!user) {
+        console.error('[DEBUG] User não encontrado no token');
+        throw new Error('User not found in token');
+      }
+      
+      console.log('[DEBUG] Token válido para user:', user.email, 'ID:', user.id);
 
       // Buscar role do usuário na base de dados (fonte de verdade)
+      console.log('[DEBUG] Buscando role do usuário no banco...');
       const userRole = await getUserRole(user.id);
       
       if (!userRole) {
+        console.error('[DEBUG] Role não encontrado para user ID:', user.id);
         throw new Error('User profile not found in database');
       }
+      
+      console.log('[DEBUG] Role encontrado:', userRole);
 
       // Verificar se tem acesso de admin
-      if (!hasAdminAccess(userRole)) {
+      const hasAccess = hasAdminAccess(userRole);
+      console.log('[DEBUG] Verificação de acesso admin:', hasAccess, 'para role:', userRole);
+      
+      if (!hasAccess) {
         throw new Error(`Access denied. User role '${userRole}' does not have admin privileges. Required: admin, administrator, or director`);
       }
 
-      console.log(`User ${user.email} with role '${userRole}' authorized to create users`);
+      console.log(`[DEBUG] User ${user.email} with role '${userRole}' authorized to create users`);
     } else {
       // Dev bypass ativo - simular role admin para teste
       console.log('DEV BYPASS: Auth disabled for smoke test');
