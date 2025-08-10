@@ -23,36 +23,32 @@ if (!EDGE_SUPABASE_URL || !EDGE_ANON_KEY || !EDGE_SERVICE_ROLE_KEY) {
   throw new Error("Edge Function environment not configured properly");
 }
 
-const supabaseAdmin = createClient(EDGE_SUPABASE_URL, EDGE_SERVICE_ROLE_KEY);
+const supaAdmin = createClient(
+  Deno.env.get("EDGE_SUPABASE_URL")!,
+  Deno.env.get("EDGE_SERVICE_ROLE")!  // SERVICE ROLE
+);
 
 // Função auxiliar para buscar role do usuário na base de dados
-async function getUserRole(userId: string): Promise<string | null> {
-  try {
-    const { data, error } = await supabaseAdmin
-      .from("profiles")
-      .select("role")
-      .eq("id", userId)
-      .single();
-
-    if (error) {
-      console.error("Erro ao buscar role do usuário:", error);
-      return null;
-    }
-
-    return data?.role || null;
-  } catch (err) {
-    console.error("Exceção ao buscar role:", err);
-    return null;
-  }
+async function getUserRole(userId: string) {
+  const { data, error } = await supaAdmin
+    .from("profiles")
+    .select("id,role,email,tab_access")
+    .eq("id", userId)
+    .single();
+  return { profile: data ?? null, error };
 }
 
 // Verificar se role tem permissão de admin
-function hasAdminAccess(role: string | null): boolean {
-  if (!role) return false;
-  
-  // Aceitar admin, administrator e director como equivalentes
-  const adminRoles = ["admin", "administrator", "director"];
-  return adminRoles.includes(role.toLowerCase());
+const ALLOWED = (Deno.env.get("EDGE_ALLOWED_ROLES") ?? "admin,administrator,director")
+  .split(",").map(s => s.trim().toLowerCase());
+
+function hasAdminAccess(role?: string | null): boolean {
+  return role ? ALLOWED.includes(role.toLowerCase()) : false;
+}
+
+// Logs de diagnóstico estruturados
+function debugLog(stage: string, info: Record<string, unknown>) {
+  console.log(JSON.stringify({ stage, ...info, ts: new Date().toISOString() }));
 }
 
 serve(async (req: Request) => {
@@ -99,51 +95,44 @@ serve(async (req: Request) => {
         throw new Error('Authorization header missing');
       }
 
-      // Criar cliente com token do usuário  
+      // Extrair Authorization: Bearer <jwt>
       const token = authHeader.replace('Bearer ', '');
-      console.log('[DEBUG] Token recebido (primeiros 50 chars):', token.substring(0, 50) + '...');
-      
       const supabaseUser = createClient(EDGE_SUPABASE_URL, EDGE_ANON_KEY);
       
-      // Verificar se o token é válido
-      console.log('[DEBUG] Validando token com Supabase...');
+      // Validar JWT com createClient anon
       const { data: { user }, error: userError } = await supabaseUser.auth.getUser(token);
       
-      if (userError) {
-        console.error('[DEBUG] Erro na validação do token:', userError);
-        throw new Error(`Invalid authentication token: ${userError.message}`);
+      if (userError || !user) {
+        return new Response(JSON.stringify({ code: 401, message: "Invalid JWT" }), {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
       }
       
-      if (!user) {
-        console.error('[DEBUG] User não encontrado no token');
-        throw new Error('User not found in token');
-      }
-      
-      console.log('[DEBUG] Token válido para user:', user.email, 'ID:', user.id);
+      debugLog("auth_ok", { userId: user.id });
 
-      // Buscar role do usuário na base de dados (fonte de verdade)
-      console.log('[DEBUG] Buscando role do usuário no banco...');
-      const userRole = await getUserRole(user.id);
+      // Buscar profile no DB com SERVICE ROLE
+      const { profile, error: profileError } = await getUserRole(user.id);
       
-      if (!userRole) {
-        console.error('[DEBUG] Role não encontrado para user ID:', user.id);
-        throw new Error('User profile not found in database');
-      }
+      debugLog("profile_fetch", { userId: user.id, hasProfile: !!profile, role: profile?.role });
       
-      console.log('[DEBUG] Role encontrado:', userRole);
-
-      // Verificar se tem acesso de admin
-      const hasAccess = hasAdminAccess(userRole);
-      console.log('[DEBUG] Verificação de acesso admin:', hasAccess, 'para role:', userRole);
-      
-      if (!hasAccess) {
-        throw new Error(`Access denied. User role '${userRole}' does not have admin privileges. Required: admin, administrator, or director`);
+      if (profileError || !profile) {
+        return new Response(JSON.stringify({ code: 403, message: "Profile not found" }), {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
       }
 
-      console.log(`[DEBUG] User ${user.email} with role '${userRole}' authorized to create users`);
-    } else {
-      // Dev bypass ativo - simular role admin para teste
-      console.log('DEV BYPASS: Auth disabled for smoke test');
+      // Verificar permissão de admin
+      if (!hasAdminAccess(profile.role)) {
+        debugLog("deny_role", { userId: user.id, role: profile?.role, allowed: ALLOWED });
+        return new Response(JSON.stringify({ code: 403, message: "Forbidden by role" }), {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
+      }
+
+      debugLog("access_granted", { userId: user.id, role: profile.role });
     }
 
     // Extrair dados do request
