@@ -1,5 +1,37 @@
 # CHANGELOG
 
+## [2025-08-10 12:30] — Edge Function create-user DEPLOYADA EM PRODUÇÃO ✅
+### 🚀 **Deploy Completo da Edge Function**
+- **URL Produção**: `https://iyukvodgqagaedomwxcs.supabase.co/functions/v1/create-user`
+- **Secrets Configurados**: Todos os `EDGE_*` secrets sem conflito com `SUPABASE_*`
+- **RBAC Implementado**: Apenas admin/director podem criar usuários
+- **Frontend Integrado**: `js/funcionarios.js` usando Edge Function com JWT
+
+### 🛡️ **Segurança de Produção**
+- **Secrets Neutros**: `EDGE_SUPABASE_URL`, `EDGE_SERVICE_ROLE_KEY`, `EDGE_ANON_KEY`, `EDGE_ALLOWED_ROLES`
+- **JWT Obrigatório**: Authorization Bearer token validado na função
+- **CORS Completo**: Headers padronizados para todas as respostas
+- **Service Role Protegida**: Nunca exposta ao frontend
+
+### 🔧 **Funcionalidades Implementadas**
+- **Healthcheck**: `GET /?health=1` retorna `{"ok": true}` (interceptado pelo Supabase)
+- **Criação de Usuário**: `POST /` com payload completo e RBAC
+- **Dev Bypass**: Sistema removido após testes (produção segura)
+- **Rollback Automático**: Desativa usuário se falha na criação do perfil
+
+### 📋 **Testes Realizados**
+- ✅ Deploy bem-sucedido
+- ✅ 401 sem JWT (comportamento esperado)
+- ✅ Secrets configurados corretamente
+- ✅ Frontend enviando Authorization header
+- ✅ RBAC funcionando (EDGE_ALLOWED_ROLES)
+
+### 📚 **Documentação**
+- **README Completo**: `supabase/functions/create-user/EDGE_FUNCTION_README.md`
+- **Comandos de Deploy**: Scripts padronizados
+- **Integração Frontend**: Exemplos de uso
+- **Segurança**: Melhores práticas documentadas
+
 ## [2025-08-09 23:50] — Configuração de Ambiente e Isolamento Deno
 ### 🔧 **Ambiente de Desenvolvimento**
 - **Edge Function .env**: Arquivo de configuração local criado com placeholders seguros

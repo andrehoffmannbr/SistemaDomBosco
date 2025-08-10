@@ -817,7 +817,7 @@ export async function addFuncionario(funcionarioData) {
         if (!session?.access_token) {
             throw new Error('Sessão expirada. Faça login novamente.');
         }
-        const res = await fetch('/functions/v1/create-user', {
+        const res = await fetch('https://iyukvodgqagaedomwxcs.supabase.co/functions/v1/create-user', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
