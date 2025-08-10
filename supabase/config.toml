@@ -1,0 +1,4 @@
+[functions]
+  [functions."create-user"]
+  # Produção: exigir JWT válido
+  verify_jwt = true

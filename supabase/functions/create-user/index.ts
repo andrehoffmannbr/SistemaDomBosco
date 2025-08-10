@@ -52,6 +52,31 @@ function debugLog(stage: string, info: Record<string, unknown>) {
 }
 
 serve(async (req: Request) => {
+  // --- DIAG: Ping para provar que o código da função está executando ---
+  // Envie Authorization: Bearer qualquer-coisa se verify_jwt estiver ativo no gateway.
+  try {
+    const url = new URL(req.url);
+    if (url.searchParams.get("diag") === "ping") {
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          from: "create-user",
+          rev: crypto.randomUUID(),
+          ts: Date.now()
+        }),
+        {
+          status: 418,
+          headers: {
+            "content-type": "application/json",
+            "cache-control": "no-store"
+          }
+        }
+      );
+    }
+  } catch (_) {
+    // se URL falhar, ignore e prossegue
+  }
+
   // CORS headers para todas as respostas
   const corsHeaders = {
     "Access-Control-Allow-Origin": "*", 
@@ -83,56 +108,50 @@ serve(async (req: Request) => {
   }
 
   try {
-    // Dev bypass para smoke test (apenas se ALLOW_NOAUTH=true e header x-dev-smoke=1)
-    const bypass = Deno.env.get('ALLOW_NOAUTH') === 'true' && req.headers.get('x-dev-smoke') === '1';
-    
-    let userRole = null;
-    
-    if (!bypass) {
-      // Verificar autorização do usuário atual (Bearer <access_token>)
-      const authHeader = req.headers.get('Authorization') ?? "";
-      if (!authHeader) {
-        throw new Error('Authorization header missing');
-      }
+    // 1) Forward do Authorization para o client do Supabase
+    const authHeader = req.headers.get("Authorization") || "";
 
-      // Extrair Authorization: Bearer <jwt>
-      const token = authHeader.replace('Bearer ', '');
-      const supabaseUser = createClient(EDGE_SUPABASE_URL, EDGE_ANON_KEY);
-      
-      // Validar JWT com createClient anon
-      const { data: { user }, error: userError } = await supabaseUser.auth.getUser(token);
-      
-      if (userError || !user) {
-        return new Response(JSON.stringify({ code: 401, message: "Invalid JWT" }), {
-          status: 401,
-          headers: { ...corsHeaders, "Content-Type": "application/json" }
-        });
-      }
-      
-      debugLog("auth_ok", { userId: user.id });
+    const supabase = createClient(EDGE_SUPABASE_URL, EDGE_ANON_KEY, {
+      global: { headers: { Authorization: authHeader } }
+    });
 
-      // Buscar profile no DB com SERVICE ROLE
-      const { profile, error: profileError } = await getUserRole(user.id);
-      
-      debugLog("profile_fetch", { userId: user.id, hasProfile: !!profile, role: profile?.role });
-      
-      if (profileError || !profile) {
-        return new Response(JSON.stringify({ code: 403, message: "Profile not found" }), {
-          status: 403,
-          headers: { ...corsHeaders, "Content-Type": "application/json" }
-        });
-      }
+    // 2) Diagnóstico seguro (sem dados sensíveis)
+    const jwtIsPresent = authHeader.startsWith("Bearer ");
+    const nowMs = Date.now();
 
-      // Verificar permissão de admin
-      if (!hasAdminAccess(profile.role)) {
-        debugLog("deny_role", { userId: user.id, role: profile?.role, allowed: ALLOWED });
-        return new Response(JSON.stringify({ code: 403, message: "Forbidden by role" }), {
-          status: 403,
-          headers: { ...corsHeaders, "Content-Type": "application/json" }
-        });
-      }
+    // 3) Descobrir usuário autenticado
+    const { data: userData, error: userErr } = await supabase.auth.getUser();
+    if (userErr || !userData?.user) {
+      return new Response(JSON.stringify({
+        code: 401,
+        message: "Invalid or missing JWT",
+        diag: { jwtIsPresent, nowMs }
+      }), { status: 401, headers: { "content-type": "application/json", "access-control-allow-origin": "*" }});
+    }
 
-      debugLog("access_granted", { userId: user.id, role: profile.role });
+    // 4) RBAC pelo profiles
+    const userId = userData.user.id;
+    const { data: profile, error: pErr } = await supabase
+      .from("profiles")
+      .select("id, role")
+      .eq("id", userId)
+      .single();
+    if (pErr || !profile) {
+      return new Response(JSON.stringify({
+        code: 403,
+        message: "Profile not found",
+        diag: { userId }
+      }), { status: 403, headers: { "content-type": "application/json", "access-control-allow-origin": "*" }});
+    }
+
+    const allowed = new Set(["admin", "administrator", "director"]);
+    const hasAdminAccess = allowed.has((profile.role || "").toLowerCase());
+    if (!hasAdminAccess) {
+      return new Response(JSON.stringify({
+        code: 403,
+        message: "Insufficient role",
+        diag: { role: profile.role }
+      }), { status: 403, headers: { "content-type": "application/json", "access-control-allow-origin": "*" }});
     }
 
     // Extrair dados do request
