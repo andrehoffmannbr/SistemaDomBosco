@@ -135,6 +135,16 @@ function setupMobileGestures() {
   }, false);
 }
 
+// Utilitário mínimo de feedback (sem alterar HTML/CSS)
+function toast(msg, type='info') {
+  console[type === 'error' ? 'error' : 'log']('[toast]', msg);
+  // se houver um componente de alerta/toast na UI, acione aqui.
+  // Por enquanto, usando showNotification existente
+  if (typeof showNotification === 'function') {
+    showNotification(msg, type);
+  }
+}
+
 async function bootApp() {
     populateDemoCredentials();
     const session = await getSession();

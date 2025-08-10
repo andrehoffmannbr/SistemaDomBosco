@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Verificação de Roles - Sistema Dom Bosco</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .result { background: #f5f5f5; padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .admin { background: #e8f5e9; }
+        .error { background: #ffebee; color: #c62828; }
+        pre { background: #fff; padding: 10px; border: 1px solid #ddd; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>Verificação de Roles - Profiles</h1>
+    <button onclick="checkRoles()">Verificar Roles Atuais</button>
+    <div id="results"></div>
+
+    <script type="module">
+        import { createClient } from 'https://cdn.skypack.dev/@supabase/supabase-js@2';
+        
+        const supabaseUrl = 'https://iyukvodgqagaedomwxcs.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml5dWt2b2RncWFnYWVkb213eGNzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ3MDYyNTUsImV4cCI6MjA3MDI4MjI1NX0.qJx_zQTaXV4chsOl5V7CYsRl3ARhg4PBb9p5Gxam7X0';
+        
+        const supabase = createClient(supabaseUrl, supabaseKey);
+
+        window.checkRoles = async function() {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<p>Verificando...</p>';
+            
+            try {
+                // Fase 0.1: Contar roles
+                const { data: profiles, error } = await supabase
+                    .from('profiles')
+                    .select('role')
+                    .order('role');
+                
+                if (error) throw error;
+                
+                const roleCounts = {};
+                profiles.forEach(p => {
+                    const role = p.role || 'null';
+                    roleCounts[role] = (roleCounts[role] || 0) + 1;
+                });
+                
+                // Fase 0.2: Listar admins
+                const { data: admins, error: adminError } = await supabase
+                    .from('profiles')
+                    .select('id, email, role, created_at')
+                    .in('role', ['admin', 'administrator', 'director'])
+                    .order('email');
+                
+                if (adminError) throw adminError;
+                
+                // Mostrar resultados
+                let html = '<div class="result">';
+                html += '<h3>Contagem por Role:</h3>';
+                html += '<pre>';
+                Object.entries(roleCounts).forEach(([role, count]) => {
+                    html += `${role}: ${count}\n`;
+                });
+                html += '</pre></div>';
+                
+                html += '<div class="result admin">';
+                html += '<h3>Admins/Directors Atuais:</h3>';
+                html += '<pre>';
+                if (admins.length === 0) {
+                    html += 'Nenhum admin/administrator/director encontrado.\n';
+                } else {
+                    admins.forEach(admin => {
+                        html += `${admin.email} - ${admin.role} (ID: ${admin.id})\n`;
+                    });
+                }
+                html += '</pre></div>';
+                
+                resultsDiv.innerHTML = html;
+                
+                // Log para console também
+                console.log('=== CONTAGEM POR ROLE ===');
+                Object.entries(roleCounts).forEach(([role, count]) => {
+                    console.log(`${role}: ${count}`);
+                });
+                console.log('\n=== ADMINS/DIRECTORS ATUAIS ===');
+                admins.forEach(admin => {
+                    console.log(`${admin.email} - ${admin.role}`);
+                });
+                
+            } catch (error) {
+                resultsDiv.innerHTML = `<div class="result error">Erro: ${error.message}</div>`;
+                console.error('Erro ao verificar roles:', error);
+            }
+        };
+    </script>
+</body>
+</html>
