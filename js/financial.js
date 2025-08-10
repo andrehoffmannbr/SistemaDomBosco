@@ -1,7 +1,7 @@
 // Financial reporting module
 import { supabase, getUser } from '../lib/supabaseClient.js';
 import { db, hydrate } from './database.js';
-import { getCurrentUser, checkTabAccess, isUserRoleIn } from './auth.js'; // Import isRoleAllowed and new role constant
+import { getCurrentUser, checkTabAccess, isUserRoleIn, DIRECTOR_OR_FINANCE } from './auth.js'; // Import isRoleAllowed and new role constant
 import { showNotification } from './ui.js';
 import { serviceNames } from './schedule.js'; // Import serviceNames for detailed reports
 
