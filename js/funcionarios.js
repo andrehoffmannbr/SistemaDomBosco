@@ -784,20 +784,77 @@ export function deleteFuncionario(funcionarioId) {
     updateGlobalSearchDatalist();
 }
 
-export function addFuncionario(funcionarioData) {
+export async function addFuncionario(funcionarioData) {
     // Check if the current user has edit access to the 'funcionarios' tab
     if (!checkTabAccess('funcionarios', 'edit')) {
         showNotification('Você não tem permissão para adicionar funcionários.', 'error');
         return false;
     }
 
-    // 🔒 Criação de contas no FRONT está desativada
-    // Contas novas devem ser criadas via Supabase Auth (Dashboard) ou backend com Service Role.
-    // Depois da criação no Auth, insira/atualize o profile correspondente e chame hydrate('users').
-    console.warn('Criação de usuários via front desativada. Use o Dashboard do Supabase.');
-    alert('Criação de usuários pelo sistema está desativada.\n\nUse o Dashboard do Supabase (Auth → Add user) e depois edite o perfil aqui.');
-    hydrate('users');
-    return false;
+    // Verificar se o usuário atual pode criar usuários (director ou admin)
+    const currentUser = getCurrentUser();
+    if (!isUserRoleIn(['director', 'admin'])) {
+        showNotification('Apenas diretor ou admin podem criar usuários.', 'error');
+        return false;
+    }
+
+    // Validar dados obrigatórios
+    if (!funcionarioData.email || !funcionarioData.password || !funcionarioData.name || !funcionarioData.role) {
+        showNotification('Email, senha, nome e cargo são obrigatórios.', 'error');
+        return false;
+    }
+
+    if (funcionarioData.password.length < 6) {
+        showNotification('A senha deve ter pelo menos 6 caracteres.', 'error');
+        return false;
+    }
+
+    try {
+        showNotification('Criando usuário...', 'info');
+
+        // payload: { email, password, name, role, tab_access }
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.access_token) {
+            throw new Error('Sessão expirada. Faça login novamente.');
+        }
+        const res = await fetch('/functions/v1/create-user', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${session.access_token}`
+            },
+            body: JSON.stringify(funcionarioData)
+        });
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+            throw new Error(data.error || 'Falha ao criar usuário');
+        }
+        await hydrate('users');
+        showNotification(`Funcionário "${funcionarioData.name}" criado com sucesso!`, 'success');
+        
+        // Limpar formulário se existir
+        const form = document.getElementById('form-novo-funcionario');
+        if (form) {
+            form.reset();
+        }
+
+        // Fechar modal se existir
+        const modal = document.getElementById('modal-novo-funcionario');
+        if (modal) {
+            modal.style.display = 'none';
+        }
+
+        // Atualizar lista de funcionários
+        renderFuncionarioList();
+        updateGlobalSearchDatalist();
+
+        return data.user;
+
+    } catch (error) {
+        console.error('Erro ao criar funcionário:', error);
+        showNotification(`Erro ao criar funcionário: ${error.message}`, 'error');
+        return false;
+    }
 }
 
 // Function to populate tab permissions dropdowns (used in add and edit modals, and permissions grid)
@@ -970,7 +1027,7 @@ export function initRolesManagement() {
         });
     };
 
-    const saveRole = () => {
+    const saveRole = async () => {
         const roleId = roleIdInput.value;
         const roleName = roleNameInput.value.trim();
 
@@ -1000,12 +1057,33 @@ export function initRolesManagement() {
                  showNotification('Um cargo com este nome (ou um ID derivado) já existe.', 'error');
                  return;
             }
-            db.roles.push({
-                id: newRoleId,
-                name: roleName,
-                tabAccess: newTabAccess,
-                isCustom: true
-            });
+            
+            // Insert new role using Supabase
+            const { data, error } = await supabase
+                .from('roles')
+                .insert({
+                    id: newRoleId,
+                    name: roleName,
+                    tab_access: newTabAccess,
+                    is_custom: true
+                })
+                .select()
+                .single();
+                
+            if (error) {
+                console.error('Error creating role:', error);
+                
+                // Tratar erro de duplicidade (constraint violation)
+                if (error.code === '23505' || error.message?.includes('duplicate key') || error.message?.includes('already exists')) {
+                    showNotification('Um cargo com este ID já existe no banco de dados. Tente usar um nome diferente.', 'error');
+                } else {
+                    showNotification('Erro ao criar cargo: ' + error.message, 'error');
+                }
+                return;
+            }
+            
+            // Update local cache
+            await hydrate('roles');
             showNotification(`Cargo "${roleName}" criado com sucesso.`, 'success');
         }
         

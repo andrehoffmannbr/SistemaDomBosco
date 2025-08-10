@@ -1663,12 +1663,12 @@ function addNewFuncionario() {
     }
 
     const username = document.getElementById('new-funcionario-username').value.trim();
+    const email = document.getElementById('new-funcionario-email').value.trim();
     const password = document.getElementById('new-funcionario-password').value.trim();
     const name = document.getElementById('new-funcionario-name').value.trim();
     const role = document.getElementById('new-funcionario-role').value; // Get from select dropdown
     const cpf = document.getElementById('new-funcionario-cpf').value.trim();
     const phone = document.getElementById('new-funcionario-phone').value.trim();
-    const email = document.getElementById('new-funcionario-email').value.trim();
     const address = document.getElementById('new-funcionario-address').value.trim();
     
     // Academic fields are now always collected if filled, regardless of the custom role string
@@ -1700,30 +1700,28 @@ function addNewFuncionario() {
         }
     });
 
-    if (!username || !password || !name || !role) {
-        showNotification('Usuário, senha, nome e cargo são campos obrigatórios.', 'warning');
+    // Use email as the primary identifier, fall back to username if no email
+    const authEmail = email || username;
+    
+    if (!authEmail || !password || !name || !role) {
+        showNotification('Email/usuário, senha, nome e cargo são campos obrigatórios.', 'warning');
         return;
     }
 
     const funcionarioData = {
-        username,
+        email: authEmail,
         password,
         name,
         role, // Use the role from select dropdown
         cpf,
         phone,
-        email,
         address,
         academicInfo: academicInfo, 
-        tabAccess: hasCustomAccess ? newTabAccess : null, 
+        tab_access: hasCustomAccess ? newTabAccess : {},
+        unit: null // For future use if units are implemented
     };
 
-    if (addFuncionario(funcionarioData)) { 
-        document.getElementById('form-add-funcionario').reset();
-        document.getElementById('modal-add-funcionario').style.display = 'none';
-        renderFuncionarioList(); 
-        updateGlobalSearchDatalist();
-    }
+    addFuncionario(funcionarioData); // This is now async, no need to wait here
 }
 
 function renderGeneralDocuments(filter = '', typeFilter = '') { 

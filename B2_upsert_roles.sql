@@ -1,12 +1,47 @@
 -- B2 - UPSERT dos cargos com tab_access padrão
 -- Execute este script no Supabase SQL Editor
+-- Melhorado com validações de segurança
 
 begin;
+
+-- Função para fazer upsert seguro de roles
+CREATE OR REPLACE FUNCTION upsert_role_safe(
+  p_id TEXT,
+  p_name TEXT,
+  p_tab_access JSONB DEFAULT NULL,
+  p_isCustom BOOLEAN DEFAULT FALSE
+)
+RETURNS VOID AS $$
+BEGIN
+  -- Validações de entrada
+  IF char_length(p_id) = 0 THEN
+    RAISE EXCEPTION 'Role ID não pode ser vazio';
+  END IF;
+  
+  IF char_length(p_name) = 0 THEN
+    RAISE EXCEPTION 'Role name não pode ser vazio';
+  END IF;
+
+  -- Insert com tab_access seguro (nunca NULL)
+  INSERT INTO public.roles (id, name, is_custom, tab_access)
+  VALUES (
+    p_id,
+    p_name,
+    p_isCustom,
+    COALESCE(p_tab_access, '{}'::jsonb)
+  )
+  ON CONFLICT (id) DO UPDATE SET
+    name = EXCLUDED.name,
+    tab_access = COALESCE(EXCLUDED.tab_access, '{}'::jsonb),
+    is_custom = EXCLUDED.is_custom;
+    
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- ADMIN
 insert into roles (id, name, is_custom, tab_access) values
 ('admin','Administrador',false,
- '{
+ COALESCE('{
     "clients":{"view":true,"create":true,"edit":true,"delete":true},
     "schedules":{"view":true,"create":true,"edit":true,"delete":true,"confirm":true},
     "daily_notes":{"view":true,"create":true,"edit":true,"delete":true},
@@ -17,13 +52,13 @@ insert into roles (id, name, is_custom, tab_access) values
     "funcionarios":{"view":true,"create":true,"edit":true,"delete":true},
     "roles":{"view":true,"create":true,"edit":true,"delete":true},
     "reports":{"view":true}
-  }'::jsonb)
-on conflict (id) do update set name=excluded.name, tab_access=excluded.tab_access;
+  }'::jsonb, '{}'::jsonb))
+on conflict (id) do update set name=excluded.name, tab_access=COALESCE(excluded.tab_access, '{}'::jsonb);
 
 -- DIRETOR
 insert into roles (id, name, is_custom, tab_access) values
 ('diretor','Diretor',false,
- '{
+ COALESCE('{
     "clients":{"view":true,"create":true,"edit":true,"delete":false},
     "schedules":{"view":true,"create":true,"edit":true,"delete":false,"confirm":true},
     "daily_notes":{"view":true,"create":false,"edit":false,"delete":false},
@@ -34,13 +69,13 @@ insert into roles (id, name, is_custom, tab_access) values
     "funcionarios":{"view":true,"create":false,"edit":true,"delete":false},
     "roles":{"view":true,"create":false,"edit":true,"delete":false},
     "reports":{"view":true}
-  }'::jsonb)
-on conflict (id) do update set name=excluded.name, tab_access=excluded.tab_access;
+  }'::jsonb, '{}'::jsonb))
+on conflict (id) do update set name=excluded.name, tab_access=COALESCE(excluded.tab_access, '{}'::jsonb);
 
 -- COORDENADOR CLÍNICO
 insert into roles (id, name, is_custom, tab_access) values
 ('coordenador','Coordenador Clínico',false,
- '{
+ COALESCE('{
     "clients":{"view":true,"create":true,"edit":true,"delete":false},
     "schedules":{"view":true,"create":true,"edit":true,"delete":false,"confirm":true},
     "daily_notes":{"view":true,"create":false,"edit":false,"delete":false},

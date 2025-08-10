@@ -1,5 +1,78 @@
 # CHANGELOG
 
+## [2025-08-09 23:50] — Configuração de Ambiente e Isolamento Deno
+### 🔧 **Ambiente de Desenvolvimento**
+- **Edge Function .env**: Arquivo de configuração local criado com placeholders seguros
+- **VS Code**: Deno isolado apenas na pasta `supabase/functions/create-user` via `deno.enablePaths`
+- **Imports**: Migração completa para npm/jsr (removido esm.sh instável)
+- **GitIgnore**: Proteção de credenciais (.env ignorado no Git)
+- **Documentação**: README.md criado na função com comandos de desenvolvimento
+
+### 🛡️ **Segurança Aprimorada**
+- **Variáveis de Ambiente**: Todas as credenciais carregadas via `Deno.env.get()`
+- **Validação**: Verificação obrigatória de todas as env vars ao inicializar
+- **CORS**: Headers completos para requisições cross-origin
+- **Isolamento**: Deno não interfere mais nos arquivos JS do frontend
+
+### 📝 **Comandos de Desenvolvimento**
+```bash
+# Servir localmente
+supabase functions serve create-user --env-file supabase/functions/create-user/.env
+
+# Cache de dependências
+deno cache --lock=deno.lock --lock-write index.ts
+
+# Deploy para produção
+supabase functions deploy create-user
+```
+
+## [2025-08-09 23:45] — Deno/VSCode + Edge Function
+- **VS Code**: `.vscode/settings.json` adicionado (Deno habilitado, import hosts)
+- **Edge Function**: `supabase/functions/create-user` padronizada (import_map, deno.json)
+- **TypeScript**: `index.ts` com validações e rollback seguro, imports padronizados
+- **Frontend**: `funcionarios.js` integrou chamada com Bearer e hydrate pós-criação
+- **Database**: `edge-function-rls.sql` aplicado (service_role em profiles)
+- **Docs**: `EDGE_FUNCTION_README.md` atualizado (deploy/teste rápido)
+
+## [2025-08-09 23:15] — Revisão Final RBAC + RLS + Edge Function (Sistema Completo)
+### 🔧 **Backend Seguro Implementado**
+- **Edge Function**: Sistema de criação de usuários via backend seguro (supabase/functions/create-user/)
+- **SERVICE_ROLE_KEY**: Mantido apenas no backend, zero exposição no frontend
+- **Autenticação JWT**: Validação completa em cada requisição
+- **Autorização RBAC**: Apenas director/admin podem criar usuários
+
+### 🛡️ **RBAC Padronizado**
+- **isUserRoleIn(allowedRoles)**: Para verificações com arrays de roles
+- **isRoleAllowed(section, action)**: Alias para checkTabAccess (compatibilidade UI)
+- **checkTabAccess(section, action)**: Função principal para tab_access
+- **Imports**: Todas dependências de RBAC corrigidas em todos os módulos
+
+### 🗄️ **Database Cache Corrigido**
+- **Zero db.push()**: Eliminados todos os pushes diretos no cache
+- **Hydrate após insert**: Todos os inserts seguidos por hydrate para atualizar cache
+- **addColumnIfExists**: Uso correto para campos opcionais como created_by
+- **Supabase Integration**: Todas operações via API, sem mutações locais
+
+### 📋 **Checklists de Segurança Validados**
+- ✅ **Segurança**: Zero SERVICE_ROLE ou process.env no frontend
+- ✅ **Legado**: Nenhum db.next* ou push direto em arquivos ativos
+- ✅ **RBAC**: Funções padronizadas com assinaturas corretas
+- ✅ **Imports**: Todos os módulos importam db de ./database.js corretamente
+- ✅ **Stock**: addColumnIfExists implementado para created_by
+- ✅ **Edge Function**: Integração completa com autenticação Bearer
+
+### 🔄 **Funcionarios.js Aprimorado**
+- **Role Creation**: Substituído push local por insert Supabase
+- **Error Handling**: Tratamento específico para erro 23505 (duplicidade)
+- **Async/Await**: Função saveRole() tornada async para Supabase
+- **Cache Update**: hydrate('roles') após criação bem-sucedida
+- **User Creation**: Integração completa com Edge Function
+
+### 📚 **Documentação Completa**
+- **EDGE_FUNCTION_README.md**: Guia completo de implementação
+- **sql/edge-function-rls.sql**: Políticas RLS para Edge Functions
+- **sql/test-edge-function.sql**: Scripts de validação e teste
+
 ## [2025-08-09 22:45] — Regressão final (Supabase + RLS)
 - Login handler corrigido (toast só em falha)
 - Boot seguro com getSession + hydrateAll condicional
