@@ -25,6 +25,36 @@ if (!EDGE_SUPABASE_URL || !EDGE_ANON_KEY || !EDGE_SERVICE_ROLE_KEY) {
 
 const supabaseAdmin = createClient(EDGE_SUPABASE_URL, EDGE_SERVICE_ROLE_KEY);
 
+// Função auxiliar para buscar role do usuário na base de dados
+async function getUserRole(userId: string): Promise<string | null> {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from("profiles")
+      .select("role")
+      .eq("id", userId)
+      .single();
+
+    if (error) {
+      console.error("Erro ao buscar role do usuário:", error);
+      return null;
+    }
+
+    return data?.role || null;
+  } catch (err) {
+    console.error("Exceção ao buscar role:", err);
+    return null;
+  }
+}
+
+// Verificar se role tem permissão de admin
+function hasAdminAccess(role: string | null): boolean {
+  if (!role) return false;
+  
+  // Aceitar admin, administrator e director como equivalentes
+  const adminRoles = ["admin", "administrator", "director"];
+  return adminRoles.includes(role.toLowerCase());
+}
+
 serve(async (req: Request) => {
   // CORS headers para todas as respostas
   const corsHeaders = {
@@ -69,38 +99,35 @@ serve(async (req: Request) => {
         throw new Error('Authorization header missing');
       }
 
-      // Criar cliente com token do usuário
+      // Criar cliente com token do usuário  
       const token = authHeader.replace('Bearer ', '');
       const supabaseUser = createClient(EDGE_SUPABASE_URL, EDGE_ANON_KEY);
       
-      // Verificar se o usuário atual é director ou admin
+      // Verificar se o token é válido
       const { data: { user }, error: userError } = await supabaseUser.auth.getUser(token);
       if (userError || !user) {
         throw new Error('Invalid authentication token');
       }
 
-      // Verificar role do usuário atual
-      const { data: profile, error: profileError } = await supabaseAdmin
-        .from('profiles')
-        .select('role')
-        .eq('id', user.id)
-        .single();
-
-      if (profileError || !profile) {
-        throw new Error('User profile not found');
-      }
-
-      userRole = profile.role;
+      // Buscar role do usuário na base de dados (fonte de verdade)
+      const userRole = await getUserRole(user.id);
       
-      // Verificar RBAC - apenas roles permitidos
-      if (!EDGE_ALLOWED_ROLES.includes(userRole)) {
-        throw new Error(`Apenas usuários com roles [${EDGE_ALLOWED_ROLES.join(',')}] podem criar usuários`);
+      if (!userRole) {
+        throw new Error('User profile not found in database');
       }
+
+      // Verificar se tem acesso de admin
+      if (!hasAdminAccess(userRole)) {
+        throw new Error(`Access denied. User role '${userRole}' does not have admin privileges. Required: admin, administrator, or director`);
+      }
+
+      console.log(`User ${user.email} with role '${userRole}' authorized to create users`);
     } else {
       // Dev bypass ativo - simular role admin para teste
-      userRole = 'admin';
       console.log('DEV BYPASS: Auth disabled for smoke test');
-    }    // Extrair dados do request
+    }
+
+    // Extrair dados do request
     const { email, password, name, role, tab_access } = await req.json();
     if (!email || !password || !name || !role) {
       return new Response(JSON.stringify({ success: false, error: 'Invalid payload' }), {
