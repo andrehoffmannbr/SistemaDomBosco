@@ -13,20 +13,6 @@ import { addGeneralDocument as addGeneralDocumentAPI, deleteGeneralDocument as d
 import { pushNotification, markNotificationRead, fetchMyNotifications } from './notifications.js';
 import { convertTimeToDecimalHours } from './utils.js'; 
 
-// ===== Helpers de DOM seguros =====
-function setTextById(id, text) {
-  const el = document.getElementById(id);
-  if (el) el.textContent = text ?? '';
-}
-function setValueById(id, val) {
-  const el = document.getElementById(id);
-  if (el) el.value = val ?? '';
-}
-function onPage(selector, fn) {
-  const el = document.querySelector(selector);
-  if (el && typeof fn === 'function') fn(el);
-} 
-
 // --- Inactivity Logout Variables ---
 let idleTimeout;
 const IDLE_TIME = 60 * 60 * 1000; // 1 hour in milliseconds
@@ -2011,14 +1997,10 @@ async function checkNotifications() {
 
             if (myNotifications.length > 0) {
                 if (unreadNotifications.length > 0) {
-                    if (notificationCountBadge) {
-                        notificationCountBadge.textContent = unreadNotifications.length;
-                        notificationCountBadge.style.display = 'flex';
-                    }
+                    notificationCountBadge.textContent = unreadNotifications.length;
+                    notificationCountBadge.style.display = 'flex';
                 } else {
-                    if (notificationCountBadge) {
-                        notificationCountBadge.style.display = 'none';
-                    }
+                    notificationCountBadge.style.display = 'none';
                 }
 
                 const notificationIcons = {

@@ -1,5 +1,19 @@
 # CHANGELOG
 
+## [2025-08-10 - Diff-Prompt Centralização e Null-Safety] 
+**Arquivos alterados:**
+- `js/auth.js` - Centralização de permissões com SUPER_ROLES e helpers de bypass admin
+- `js/stock.js` - Correção de permissões admin via checkTabAccess
+- `js/financial.js` - Data padrão robusta e permissões centralizadas  
+- `js/main.js` - Helpers DOM null-safe e correção de imports
+
+**Correções aplicadas:**
+- ✅ Admin bypass centralizado via isSuperUser() e checkTabAccess()
+- ✅ Null-safety helpers (setTextById, setValueById, onPage) 
+- ✅ Data padrão robusta em addDailyNote (YYYY-MM-DD)
+- ✅ Correção import getCurrentUser (auth.js em vez de database.js)
+- ✅ Backup criado em backup/ antes das alterações
+
 ## [2025-08-10 12:30] — Edge Function create-user DEPLOYADA EM PRODUÇÃO ✅
 ### 🚀 **Deploy Completo da Edge Function**
 - **URL Produção**: `https://iyukvodgqagaedomwxcs.supabase.co/functions/v1/create-user`

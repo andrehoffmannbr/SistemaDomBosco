@@ -105,55 +105,23 @@ export function isUserRoleIn(allowedRoles) {
 }
 
 // ADMIN ROLES – bypass total de UI
-export const SUPER_ROLES = ['admin', 'administrator', 'director'];
+export const SUPER_ROLES = new Set(['admin','administrator','director']);
 
-// Retorna o papel atual do usuário logado a partir do localStorage (compat UI)
-export function getCurrentUserRole() {
-  try {
-    const raw = localStorage.getItem('currentUser');
-    if (!raw) return null;
-    const u = JSON.parse(raw);
-    return (u?.role || '').toLowerCase();
-  } catch { return null; }
+export function isSuperUser(user) {
+  const role = (user?.role || '').toLowerCase();
+  return SUPER_ROLES.has(role);
 }
 
-// true se papel ∈ SUPER_ROLES
-export function isSuperUser(roleOrUser) {
-  const role = (typeof roleOrUser === 'string'
-    ? roleOrUser
-    : (roleOrUser?.role || getCurrentUserRole() || '')
-  ).toLowerCase();
-  return SUPER_ROLES.includes(role);
-}
-
-// Helper genérico de checagem por conjunto de roles
-export function isUserRoleIn(allowedRoles = []) {
-  const role = getCurrentUserRole();
-  if (!role) return false;
-  if (isSuperUser(role)) return true; // bypass admin
-  return allowedRoles.map(r => (r||'').toLowerCase()).includes(role);
-}
-
-// Controle fino de abas: se admin ⇒ sempre true
-// resource: 'stock' | 'financial' | 'reports' | ...
-// action: 'view' | 'edit' | 'create' | 'delete'
-export function checkTabAccess(resource, action='view') {
-  if (isSuperUser()) return true; // bypass absoluto para admin
-  // Mantém lógica antiga que você já tem em auth.js (se existir); caso não exista, retornar true por padrão
-  try {
-    // Se existir alguma tabela/objeto tabAccess no currentUser, respeitar
-    const raw = localStorage.getItem('currentUser');
-    const u = raw ? JSON.parse(raw) : null;
-    const access = u?.tabAccess || u?.tab_access || {};
-    const entry = access?.[resource];
-    if (!entry) return true; // default permissivo se não configurado
-    // entry pode ser boolean ou objeto com flags
-    if (typeof entry === 'boolean') return entry;
-    const key = (action || 'view').toLowerCase();
-    return Boolean(entry?.[key] ?? entry?.view ?? true);
-  } catch {
-    return true;
-  }
+// Admin sempre pode tudo; caso contrário, checa tabAccess. Ação padrão: "view".
+export function checkTabAccess(section, action = 'view') {
+  const u = getCurrentUser();
+  if (!u) return false;
+  // Bypass: superuser sempre pode
+  if (isSuperUser(u)) return true;
+  const ta = u.tabAccess || {};
+  const sec = ta[section];
+  if (!sec) return false;
+  return !!(action in sec ? sec[action] : sec.view);
 }
 
 // Mantém a assinatura pública esperada pela UI (NÃO REMOVER)

@@ -1,13 +1,9 @@
 // Financial reporting module
 import { supabase, getUser } from '../lib/supabaseClient.js';
 import { db, hydrate } from './database.js';
-import { getCurrentUser, checkTabAccess, isUserRoleIn } from './auth.js'; // Import isRoleAllowed and new role constant
+import { getCurrentUser, checkTabAccess } from './auth.js'; // Import isRoleAllowed and new role constant
 import { showNotification } from './ui.js';
 import { serviceNames } from './schedule.js'; // Import serviceNames for detailed reports
-
-// Null-safe setters para este módulo
-function setText(el, text) { if (el) el.textContent = text ?? ''; }
-function setValue(el, val) { if (el) el.value = val ?? ''; }
 
 // [B4] NEW: Centralized daily notes functions
 export async function addDailyNote(note) {
@@ -50,21 +46,20 @@ export async function deleteDailyNote(id) {
 }
 
 export function renderFinancialReport(selectedPeriod = 'current-month') {
-    // Admin bypass e controle de permissão centralizado
-    if (!checkTabAccess('financial','view')) {
+    // Only Director and Finance roles can view financial reports
+    if (!isUserRoleIn(DIRECTOR_OR_FINANCE)) {
         const financialList = document.getElementById('financial-list');
         if (financialList) {
             financialList.innerHTML = '<p>Você não tem permissão para visualizar relatórios financeiros.</p>';
         }
-        // também zera, com null-safety, os elementos mais comuns
-        setText(document.getElementById('monthly-revenue'), 'R$ 0,00');
-        setText(document.getElementById('monthly-appointments'), '0');
-        setText(document.getElementById('stock-entries-value'), 'R$ 0,00');
-        setText(document.getElementById('stock-exits-value'), 'R$ 0,00');
-        setText(document.getElementById('net-result'), 'R$ 0,00');
-        setText(document.getElementById('active-clients'), '0');
-        setText(document.getElementById('total-schedules'), '0');
-        setText(document.getElementById('financial-period-display'), 'Acesso Restrito');
+        document.getElementById('monthly-revenue').textContent = 'R$ 0,00';
+        document.getElementById('monthly-appointments').textContent = '0';
+        document.getElementById('stock-entries-value').textContent = 'R$ 0,00';
+        document.getElementById('stock-exits-value').textContent = 'R$ 0,00';
+        document.getElementById('net-result').textContent = 'R$ 0,00';
+        document.getElementById('active-clients').textContent = '0';
+        document.getElementById('total-schedules').textContent = '0';
+        document.getElementById('financial-period-display').textContent = 'Acesso Restrito';
         return;
     }
     
@@ -187,13 +182,13 @@ export function renderFinancialReport(selectedPeriod = 'current-month') {
     });
 
     // Update summary cards with clearer terminology
-    setText(document.getElementById('monthly-revenue'), `R$ ${totalRevenue.toFixed(2).replace('.', ',')}`);
-    setText(document.getElementById('monthly-appointments'), totalAppointmentsInPeriod);
-    setText(document.getElementById('stock-entries-value'), `R$ ${totalStockPurchases.toFixed(2).replace('.', ',')}`);
-    setText(document.getElementById('stock-exits-value'), `R$ ${totalMaterialsCost.toFixed(2).replace('.', ',')}`);
-    setText(document.getElementById('net-result'), `R$ ${netResult.toFixed(2).replace('.', ',')}`);
-    setText(document.getElementById('active-clients'), db.clients.length);
-    setText(document.getElementById('total-schedules'), totalSchedulesInPeriod);
+    document.getElementById('monthly-revenue').textContent = `R$ ${totalRevenue.toFixed(2).replace('.', ',')}`;
+    document.getElementById('monthly-appointments').textContent = totalAppointmentsInPeriod;
+    document.getElementById('stock-entries-value').textContent = `R$ ${totalStockPurchases.toFixed(2).replace('.', ',')}`;
+    document.getElementById('stock-exits-value').textContent = `R$ ${totalMaterialsCost.toFixed(2).replace('.', ',')}`;
+    document.getElementById('net-result').textContent = `R$ ${netResult.toFixed(2).replace('.', ',')}`;
+    document.getElementById('active-clients').textContent = db.clients.length;
+    document.getElementById('total-schedules').textContent = totalSchedulesInPeriod;
     
     // Update period display
     const periodNames = {
@@ -205,7 +200,9 @@ export function renderFinancialReport(selectedPeriod = 'current-month') {
     };
     
     const periodDisplayElement = document.getElementById('financial-period-display');
-    setText(periodDisplayElement, periodNames[selectedPeriod] || 'Todos os períodos');
+    if (periodDisplayElement) {
+        periodDisplayElement.textContent = periodNames[selectedPeriod] || 'Todos os períodos';
+    }
 
     // Color the net result based on positive/negative
     const netResultElement = document.getElementById('net-result');
