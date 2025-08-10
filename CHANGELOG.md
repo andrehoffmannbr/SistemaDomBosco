@@ -1,5 +1,18 @@
 # CHANGELOG
 
+## [2025-08-10 - Fix "already been declared" + Single Script Load] 
+**Correções críticas:**
+- ✅ Unificados helpers de permissão em auth.js (SUPER_ROLES, isSuperUser, checkTabAccess)
+- ✅ Unificados helpers DOM em main.js (setTextById, setValueById, onPage)
+- ✅ Removidas todas duplicatas de funções e constantes
+- ✅ Normalizada ordem de carregamento de scripts no index.html
+- ✅ Eliminados erros "Identifier has already been declared"
+
+**Arquivos alterados:**
+- `js/auth.js` - Single source para permissões (removidas duplicatas)
+- `js/main.js` - Single source para helpers DOM (removidas duplicatas)  
+- `index.html` - Ordem canônica de scripts sem duplicatas
+
 ## [2025-08-10 - Diff-Prompt Centralização e Null-Safety] 
 **Arquivos alterados:**
 - `js/auth.js` - Centralização de permissões com SUPER_ROLES e helpers de bypass admin

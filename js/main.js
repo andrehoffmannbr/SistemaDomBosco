@@ -13,19 +13,19 @@ import { addGeneralDocument as addGeneralDocumentAPI, deleteGeneralDocument as d
 import { pushNotification, markNotificationRead, fetchMyNotifications } from './notifications.js';
 import { convertTimeToDecimalHours } from './utils.js'; 
 
-// ===== Helpers de DOM seguros =====
-function setTextById(id, text) {
+// ===== DOM HELPERS — SINGLE SOURCE (não duplicar) =====
+export function setTextById(id, value) {
   const el = document.getElementById(id);
-  if (el) el.textContent = text ?? '';
+  if (el) el.textContent = value ?? '';
 }
-function setValueById(id, val) {
+export function setValueById(id, value) {
   const el = document.getElementById(id);
-  if (el) el.value = val ?? '';
+  if (el) el.value = value ?? '';
 }
-function onPage(selector, fn) {
-  const el = document.querySelector(selector);
-  if (el && typeof fn === 'function') fn(el);
-} 
+export function onPage(id) {
+  return !!document.getElementById(id);
+}
+// ===== END DOM HELPERS — SINGLE SOURCE ===== 
 
 // --- Inactivity Logout Variables ---
 let idleTimeout;
@@ -44,18 +44,6 @@ function logoutUser() {
     logout(); // Perform the actual logout logic
     showLoginScreen(); // Show the login screen
     showNotification('Você foi desconectado(a) devido à inatividade.', 'info', 'Inatividade', 7000);
-}
-
-// Helper null-safe para escrever texto
-function setTextById(id, text) {
-  const el = document.getElementById(id);
-  if (el) el.textContent = text ?? '';
-}
-
-// Helper null-safe para setar value
-function setValueById(id, value) {
-  const el = document.getElementById(id);
-  if (el) el.value = value ?? '';
 }
 
 // Helper para verificar se estamos em uma página específica

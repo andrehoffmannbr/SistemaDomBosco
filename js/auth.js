@@ -4,6 +4,37 @@ import { hydrateAll } from './database.js';
 
 export let currentUser = null;
 
+// ===== PERMISSIONS — SINGLE SOURCE (não duplicar) =====
+export const SUPER_ROLES = ['admin', 'administrator', 'director'];
+export const DIRECTOR_OR_FINANCE = ['admin', 'administrator', 'director', 'financeiro', 'coordenador'];
+
+export function isUserRoleIn(role, set) {
+  return Array.isArray(set) && set.includes(role);
+}
+
+export function isSuperUser(role) {
+  return isUserRoleIn(role, SUPER_ROLES);
+}
+
+/**
+ * checkTabAccess(tab, action) -> boolean
+ * - tab: string (ex.: 'financial', 'stock', 'reports', 'funcionarios')
+ * - action: 'view' | 'edit' (opcional, default 'view')
+ * Bypass: SUPER_ROLES sempre true
+ */
+export function checkTabAccess(tab, action = 'view', currentUserParam) {
+  const u = currentUserParam ?? getCurrentUser(); // usa helper já existente quando disponível
+  const role = u?.role;
+  if (!role) return false;
+  if (isSuperUser(role)) return true; // bypass admin/director/administrator
+  // compat: se houver tabela de tabAccess no currentUser, respeite
+  const access = u?.tabAccess?.[tab];
+  if (!access) return false;
+  if (action === 'edit') return access === 'Editar' || access === 'Ver e Editar' || access === 'edit';
+  return access === 'Ver' || access === 'Editar' || access === 'Ver e Editar' || access === 'view' || access === 'edit';
+}
+// ===== END PERMISSIONS — SINGLE SOURCE =====
+
 // New: Role-based access control helper constants
 // These constants define the roles allowed for different features/tabs.
 // 'financeiro' is intentionally excluded from all non-financial access groups.
@@ -12,8 +43,6 @@ export let currentUser = null;
 export const DIRECTOR_ONLY = ['director'];
 // Roles with access to only Finance-specific features (e.g., daily financial notes)
 export const FINANCE_ONLY = ['financeiro'];
-// Roles with combined Director or Finance access (e.g., viewing main financial report)
-export const DIRECTOR_OR_FINANCE = ['director', 'financeiro'];
 // NEW: Roles with access to stock management features (Director and Finance)
 export const STOCK_MANAGERS = ['director', 'financeiro'];
 // Roles with Coordinator access and higher (Director included)
@@ -102,58 +131,6 @@ export function isUserRoleIn(allowedRoles) {
   return Array.isArray(allowedRoles)
     ? allowedRoles.includes(user.role)
     : user.role === allowedRoles;
-}
-
-// ADMIN ROLES – bypass total de UI
-export const SUPER_ROLES = ['admin', 'administrator', 'director'];
-
-// Retorna o papel atual do usuário logado a partir do localStorage (compat UI)
-export function getCurrentUserRole() {
-  try {
-    const raw = localStorage.getItem('currentUser');
-    if (!raw) return null;
-    const u = JSON.parse(raw);
-    return (u?.role || '').toLowerCase();
-  } catch { return null; }
-}
-
-// true se papel ∈ SUPER_ROLES
-export function isSuperUser(roleOrUser) {
-  const role = (typeof roleOrUser === 'string'
-    ? roleOrUser
-    : (roleOrUser?.role || getCurrentUserRole() || '')
-  ).toLowerCase();
-  return SUPER_ROLES.includes(role);
-}
-
-// Helper genérico de checagem por conjunto de roles
-export function isUserRoleIn(allowedRoles = []) {
-  const role = getCurrentUserRole();
-  if (!role) return false;
-  if (isSuperUser(role)) return true; // bypass admin
-  return allowedRoles.map(r => (r||'').toLowerCase()).includes(role);
-}
-
-// Controle fino de abas: se admin ⇒ sempre true
-// resource: 'stock' | 'financial' | 'reports' | ...
-// action: 'view' | 'edit' | 'create' | 'delete'
-export function checkTabAccess(resource, action='view') {
-  if (isSuperUser()) return true; // bypass absoluto para admin
-  // Mantém lógica antiga que você já tem em auth.js (se existir); caso não exista, retornar true por padrão
-  try {
-    // Se existir alguma tabela/objeto tabAccess no currentUser, respeitar
-    const raw = localStorage.getItem('currentUser');
-    const u = raw ? JSON.parse(raw) : null;
-    const access = u?.tabAccess || u?.tab_access || {};
-    const entry = access?.[resource];
-    if (!entry) return true; // default permissivo se não configurado
-    // entry pode ser boolean ou objeto com flags
-    if (typeof entry === 'boolean') return entry;
-    const key = (action || 'view').toLowerCase();
-    return Boolean(entry?.[key] ?? entry?.view ?? true);
-  } catch {
-    return true;
-  }
 }
 
 // Mantém a assinatura pública esperada pela UI (NÃO REMOVER)
