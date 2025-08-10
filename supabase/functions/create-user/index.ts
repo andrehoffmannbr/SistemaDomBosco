@@ -9,7 +9,7 @@ import { createClient } from "@supabase/supabase-js";
 // Carregar variáveis de ambiente
 const EDGE_SUPABASE_URL = Deno.env.get("EDGE_SUPABASE_URL");
 const EDGE_ANON_KEY = Deno.env.get("EDGE_ANON_KEY");
-const EDGE_SERVICE_ROLE_KEY = Deno.env.get("EDGE_SERVICE_ROLE");
+const EDGE_SERVICE_ROLE_KEY = Deno.env.get("EDGE_SERVICE_ROLE_KEY");
 const EDGE_ALLOWED_ROLES = (Deno.env.get("EDGE_ALLOWED_ROLES") || "admin,director")
   .split(",").map(s => s.trim()).filter(Boolean);
 const ALLOW_NOAUTH = Deno.env.get("ALLOW_NOAUTH");
@@ -19,13 +19,13 @@ if (!EDGE_SUPABASE_URL || !EDGE_ANON_KEY || !EDGE_SERVICE_ROLE_KEY) {
   console.error("Missing required environment variables:");
   console.error("EDGE_SUPABASE_URL:", !!EDGE_SUPABASE_URL);
   console.error("EDGE_ANON_KEY:", !!EDGE_ANON_KEY);
-  console.error("EDGE_SERVICE_ROLE:", !!EDGE_SERVICE_ROLE_KEY);
+  console.error("EDGE_SERVICE_ROLE_KEY:", !!EDGE_SERVICE_ROLE_KEY);
   throw new Error("Edge Function environment not configured properly");
 }
 
 const supaAdmin = createClient(
   Deno.env.get("EDGE_SUPABASE_URL")!,
-  Deno.env.get("EDGE_SERVICE_ROLE")!  // SERVICE ROLE
+  Deno.env.get("EDGE_SERVICE_ROLE_KEY")!  // SERVICE ROLE
 );
 
 // Função auxiliar para buscar role do usuário na base de dados
@@ -111,7 +111,8 @@ serve(async (req: Request) => {
     // 1) Forward do Authorization para o client do Supabase
     const authHeader = req.headers.get("Authorization") || "";
 
-    const supabase = createClient(EDGE_SUPABASE_URL, EDGE_ANON_KEY, {
+    // Para validar JWT, usar service role key ao invés de anon key
+    const supabase = createClient(EDGE_SUPABASE_URL, EDGE_SERVICE_ROLE_KEY, {
       global: { headers: { Authorization: authHeader } }
     });
 
@@ -169,7 +170,7 @@ serve(async (req: Request) => {
     }
 
     // :one: Criar usuário no Auth
-    const { data: user, error: authError } = await supabaseAdmin.auth.admin.createUser({
+    const { data: user, error: authError } = await supaAdmin.auth.admin.createUser({
       email,
       password,
       email_confirm: true,
@@ -182,7 +183,7 @@ serve(async (req: Request) => {
     }
 
     // :two: Criar perfil no DB
-    const { error: profileError } = await supabaseAdmin
+    const { error: profileError } = await supaAdmin
       .from("profiles")
       .insert({
         id: user.user.id,
@@ -194,7 +195,7 @@ serve(async (req: Request) => {
     if (profileError) {
       // rollback opcional (desativar usuário recém-criado)
       try {
-        await supabaseAdmin.auth.admin.updateUserById(user.user.id, { banned_until: "2999-01-01T00:00:00Z" });
+        await supaAdmin.auth.admin.updateUserById(user.user.id, { banned_until: "2999-01-01T00:00:00Z" });
       } catch (_) {}
       return new Response(JSON.stringify({ success: false, error: profileError.message }), {
         status: 400, 
