@@ -104,11 +104,20 @@ export function isUserRoleIn(allowedRoles) {
     : user.role === allowedRoles;
 }
 
+// ADMIN ROLES – bypass total de UI
+export const SUPER_ROLES = new Set(['admin','administrator','director']);
+
+export function isSuperUser(user) {
+  const role = (user?.role || '').toLowerCase();
+  return SUPER_ROLES.has(role);
+}
+
 // Admin sempre pode tudo; caso contrário, checa tabAccess. Ação padrão: "view".
 export function checkTabAccess(section, action = 'view') {
   const u = getCurrentUser();
   if (!u) return false;
-  if (u.role === 'admin') return true;
+  // Bypass: superuser sempre pode
+  if (isSuperUser(u)) return true;
   const ta = u.tabAccess || {};
   const sec = ta[section];
   if (!sec) return false;

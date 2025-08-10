@@ -1,15 +1,15 @@
 // Stock management module
 import { supabase, getUser } from '../lib/supabaseClient.js';
 import { db, hydrate } from './database.js';
-import { getCurrentUser, isRoleAllowed, isUserRoleIn, DIRECTOR_ONLY, STOCK_MANAGERS } from './auth.js';
+import { getCurrentUser, checkTabAccess } from './auth.js';
 import { addColumnIfExists } from './utils.js';
 
 export function renderStockList() {
     const stockList = document.getElementById('stock-list');
     if (!stockList) return;
     
-    // Only Director and Finance can view stock
-    if (!isUserRoleIn(STOCK_MANAGERS)) {
+    // Usar checkTabAccess centralizado
+    if (!checkTabAccess('estoque', 'view')) {
         stockList.innerHTML = '<p>Você não tem permissão para visualizar o estoque.</p>';
         return;
     }
@@ -153,8 +153,8 @@ export function renderStockMovements(selectedMonthYear = null) {
     const stockMovements = document.getElementById('stock-movements');
     if (!stockMovements) return;
 
-    // Only Director and Finance can view stock movements
-    if (!isUserRoleIn(STOCK_MANAGERS)) {
+    // Usar checkTabAccess centralizado
+    if (!checkTabAccess('estoque', 'view')) {
         stockMovements.innerHTML = '<p>Você não tem permissão para visualizar movimentações de estoque.</p>';
         return;
     }
@@ -373,7 +373,7 @@ export async function adjustStock(itemId, action) {
 
 // NEW: Update stock function
 export async function updateStock(itemId, quantity, reason, action = 'adjustment') {
-    if (!isUserRoleIn(STOCK_MANAGERS)) {
+    if (!checkTabAccess('estoque', 'edit')) {
         showNotification('Você não tem permissão para atualizar o estoque.', 'error');
         return;
     }
@@ -423,8 +423,8 @@ export async function updateStock(itemId, quantity, reason, action = 'adjustment
 }
 
 export function showDeleteStockItemConfirmation(itemId) {
-    // Only Director and Finance can delete stock items
-    if (!isUserRoleIn(STOCK_MANAGERS)) { 
+    // Usar checkTabAccess centralizado
+    if (!checkTabAccess('estoque', 'edit')) { 
         showNotification('Você não tem permissão para excluir itens do estoque.', 'error'); 
         return; 
     }

@@ -32,6 +32,21 @@ function logoutUser() {
     showNotification('Você foi desconectado(a) devido à inatividade.', 'info', 'Inatividade', 7000);
 }
 
+// Helper null-safe para escrever texto
+function setTextById(id, text) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = text ?? '';
+}
+
+// Helper null-safe para setar value
+function setValueById(id, value) {
+  const el = document.getElementById(id);
+  if (el) el.value = value ?? '';
+}
+
+// Helper para verificar se estamos em uma página específica
+const onPage = (sel) => !!document.querySelector(sel);
+
 // Make necessary functions globally available for onclicks or direct access
 window.showClientDetails = showClientDetails;
 window.updateScheduleStatus = updateScheduleStatus;
@@ -540,7 +555,7 @@ function setupEventListeners() {
     if (btnClearStockFilter) {
         btnClearStockFilter.addEventListener('click', () => {
             if (!checkTabAccess('estoque', 'view')) return; // Check if user has view permission for the tab
-            document.getElementById('stock-month-selector').value = '';
+            setValueById('stock-month-selector', '');
             renderStockMovements();
             showNotification('Filtro removido - mostrando todas as movimentações!', 'info');
         });
@@ -552,9 +567,9 @@ function setupEventListeners() {
         populateServiceTypes();
         populateAssignableUsers();
         const today = new Date().toISOString().split('T')[0];
-        document.getElementById('data-agendamento').value = today;
+        setValueById('data-agendamento', today);
         document.getElementById('modal-novo-agendamento').style.display = 'flex';
-        document.getElementById('select-cliente-agenda').value = '';
+        setValueById('select-cliente-agenda', '');
     });
 
     document.getElementById('btn-schedule-new-appointment').addEventListener('click', () => {
@@ -569,10 +584,10 @@ function setupEventListeners() {
         populateServiceTypes();
         populateAssignableUsers();
         
-        document.getElementById('select-cliente-agenda').value = currentClientId;
+        setValueById('select-cliente-agenda', currentClientId);
         
         const today = new Date().toISOString().split('T')[0];
-        document.getElementById('data-agendamento').value = today;
+        setValueById('data-agendamento', today);
         document.getElementById('modal-novo-agendamento').style.display = 'flex';
     });
 
@@ -592,7 +607,7 @@ function setupEventListeners() {
         
         populateAnamnesisSelect();
         const today = new Date().toISOString().split('T')[0];
-        document.getElementById('data-atendimento').value = today;
+        setValueById('data-atendimento', today);
         document.getElementById('modal-novo-atendimento').style.display = 'flex';
     });
 
@@ -911,9 +926,9 @@ function setupEventListeners() {
     document.getElementById('btn-add-daily-note').addEventListener('click', () => {
         if (!checkTabAccess('financeiro', 'edit')) { showNotification('Você não tem permissão para adicionar notas diárias financeiras.', 'error'); return; }
         const today = new Date().toISOString().split('T')[0];
-        document.getElementById('daily-note-date').value = today;
+        setValueById('daily-note-date', today);
         document.getElementById('form-add-daily-note').reset();
-        document.getElementById('daily-note-date').value = today;
+        setValueById('daily-note-date', today);
         document.getElementById('modal-add-daily-note').style.display = 'flex';
     });
 
@@ -926,7 +941,7 @@ function setupEventListeners() {
         if (!checkTabAccess('financeiro', 'view')) { showNotification('Você não tem permissão para gerar relatórios financeiros.', 'error'); return; }
         const selectedPeriod = document.getElementById('financial-period-selector').value ||
                              'current-month';
-        document.getElementById('report-period-selector-modal').value = selectedPeriod;
+        setValueById('report-period-selector-modal', selectedPeriod);
         generateDetailedFinancialReport(selectedPeriod);
         document.getElementById('modal-monthly-report').style.display = 'flex';
     });
@@ -998,8 +1013,8 @@ function setupEventListeners() {
         // Set default date/time for meeting
         const now = new Date();
         const futureTime = new Date(now.getTime() + 60 * 60 * 1000); // 1 hour from now
-        document.getElementById('meeting-alert-date').value = now.toISOString().split('T')[0];
-        document.getElementById('meeting-alert-time').value = futureTime.toTimeString().slice(0, 5);
+        setValueById('meeting-alert-date', now.toISOString().split('T')[0]);
+        setValueById('meeting-alert-time', futureTime.toTimeString().slice(0, 5));
 
         document.getElementById('modal-add-meeting-alert').style.display = 'flex';
     });

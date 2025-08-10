@@ -1,7 +1,7 @@
 // Financial reporting module
 import { supabase, getUser } from '../lib/supabaseClient.js';
 import { db, hydrate } from './database.js';
-import { getCurrentUser, isRoleAllowed, isUserRoleIn, DIRECTOR_OR_FINANCE, DIRECTOR_ONLY } from './auth.js'; // Import isRoleAllowed and new role constant
+import { getCurrentUser, checkTabAccess } from './auth.js'; // Import isRoleAllowed and new role constant
 import { showNotification } from './ui.js';
 import { serviceNames } from './schedule.js'; // Import serviceNames for detailed reports
 
@@ -11,10 +11,17 @@ export async function addDailyNote(note) {
         const user = await getUser();
         if (!user) throw new Error('Usuário não autenticado');
         
+        // data padrão (YYYY-MM-DD) quando não vier do form
+        const today = new Date();
+        const yyyy = today.getFullYear();
+        const mm = String(today.getMonth()+1).padStart(2,'0');
+        const dd = String(today.getDate()).padStart(2,'0');
+        const safeDate = note?.date || `${yyyy}-${mm}-${dd}`;
+
         const payload = { 
             ...note, 
+            date: safeDate,
             user_id: user.id,
-            date: note.date || new Date().toISOString().split('T')[0],
             created_at: new Date().toISOString()
         };
         
