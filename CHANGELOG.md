@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## [2025-08-10 - Guarda Global + Ordem Canônica Scripts] 
+**Correções finais para "already been declared":**
+- ✅ Helpers com guarda global via `globalThis` (auth.js e main.js)
+- ✅ Ordem canônica de scripts: auth.js → database.js → clients.js → schedule.js → stock.js → financial.js → ui.js → forms.js → mural.js → notifications.js → main.js (final)
+- ✅ Eliminada possibilidade de redeclaração em recarregamentos
+
+**Arquivos alterados:**
+- `js/auth.js` - Helpers com `globalThis.X ??= function()` 
+- `js/main.js` - DOM helpers com `globalThis.X ??= function()`
+- `index.html` - Ordem canônica e carregamento único garantido
+
 ## [2025-08-10 - Fix "already been declared" + Single Script Load] 
 **Correções críticas:**
 - ✅ Unificados helpers de permissão em auth.js (SUPER_ROLES, isSuperUser, checkTabAccess)

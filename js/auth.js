@@ -4,35 +4,36 @@ import { hydrateAll } from './database.js';
 
 export let currentUser = null;
 
-// ===== PERMISSIONS — SINGLE SOURCE (não duplicar) =====
-export const SUPER_ROLES = ['admin', 'administrator', 'director'];
-export const DIRECTOR_OR_FINANCE = ['admin', 'administrator', 'director', 'financeiro', 'coordenador'];
+// === Helpers canônicos com guarda global (evita "already been declared") ===
+export const SUPER_ROLES = (globalThis.SUPER_ROLES ??= ['admin','administrator','director']);
+export const DIRECTOR_OR_FINANCE = (globalThis.DIRECTOR_OR_FINANCE ??=
+  ['admin','administrator','director','financeiro','coordenador']);
 
-export function isUserRoleIn(role, set) {
-  return Array.isArray(set) && set.includes(role);
-}
+export const isUserRoleIn = (globalThis.isUserRoleIn ??=
+  (role, set) => Array.isArray(set) && set.includes(role));
 
-export function isSuperUser(role) {
-  return isUserRoleIn(role, SUPER_ROLES);
-}
+export const isSuperUser = (globalThis.isSuperUser ??=
+  (role) => isUserRoleIn(role, SUPER_ROLES));
 
-/**
- * checkTabAccess(tab, action) -> boolean
- * - tab: string (ex.: 'financial', 'stock', 'reports', 'funcionarios')
- * - action: 'view' | 'edit' (opcional, default 'view')
- * Bypass: SUPER_ROLES sempre true
- */
-export function checkTabAccess(tab, action = 'view', currentUserParam) {
-  const u = currentUserParam ?? getCurrentUser(); // usa helper já existente quando disponível
-  const role = u?.role;
-  if (!role) return false;
-  if (isSuperUser(role)) return true; // bypass admin/director/administrator
-  // compat: se houver tabela de tabAccess no currentUser, respeite
-  const access = u?.tabAccess?.[tab];
-  if (!access) return false;
-  if (action === 'edit') return access === 'Editar' || access === 'Ver e Editar' || access === 'edit';
-  return access === 'Ver' || access === 'Editar' || access === 'Ver e Editar' || access === 'view' || access === 'edit';
-}
+// checkTabAccess mantém a sua lógica original; só envolvemos num guard
+export const checkTabAccess = (globalThis.checkTabAccess ??=
+  (tab, action = 'view', currentUser) => {
+    // pega usuário atual sem quebrar SSR
+    const getCU = globalThis.getCurrentUser ?? (() => {
+      try { return JSON.parse(localStorage.getItem('currentUser')||'null'); } catch { return null; }
+    });
+    const u = currentUser ?? getCU();
+    const role = u?.role;
+    if (!role) return false;
+    if (isSuperUser(role)) return true; // bypass admin
+    const access = u?.tabAccess?.[tab];
+    if (!access) return false;
+    if (action === 'edit') {
+      return access === 'Editar' || access === 'Ver e Editar' || access === 'edit';
+    }
+    // view
+    return access === 'Ver' || access === 'Editar' || access === 'Ver e Editar' || access === 'view' || access === 'edit';
+  });
 // ===== END PERMISSIONS — SINGLE SOURCE =====
 
 // New: Role-based access control helper constants

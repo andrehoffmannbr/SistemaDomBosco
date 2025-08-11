@@ -14,17 +14,12 @@ import { pushNotification, markNotificationRead, fetchMyNotifications } from './
 import { convertTimeToDecimalHours } from './utils.js'; 
 
 // ===== DOM HELPERS — SINGLE SOURCE (não duplicar) =====
-export function setTextById(id, value) {
-  const el = document.getElementById(id);
-  if (el) el.textContent = value ?? '';
-}
-export function setValueById(id, value) {
-  const el = document.getElementById(id);
-  if (el) el.value = value ?? '';
-}
-export function onPage(id) {
-  return !!document.getElementById(id);
-}
+export const setTextById  = (globalThis.setTextById  ??=
+  (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v ?? ''; });
+export const setValueById = (globalThis.setValueById ??=
+  (id, v) => { const el = document.getElementById(id); if (el) el.value = v ?? ''; });
+export const onPage       = (globalThis.onPage       ??=
+  (id) => !!document.getElementById(id));
 // ===== END DOM HELPERS — SINGLE SOURCE ===== 
 
 // --- Inactivity Logout Variables ---
