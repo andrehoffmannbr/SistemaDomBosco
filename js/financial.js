@@ -110,9 +110,9 @@ export function renderFinancialReport(selectedPeriod = 'current-month') {
     let totalSchedulesInPeriod = 0;
     
     // Calculate appointments and revenue
-    db.clients.forEach(client => {
+    safeArray(db.clients).forEach(client => {
         if (client.appointments) {
-            client.appointments.forEach(appointment => {
+            safeArray(client.appointments).forEach(appointment => {
                 const appointmentDate = new Date(appointment.date);
                 if (isNaN(appointmentDate.getTime())) {
                     console.warn(`Invalid appointment date for client ${client.id}: ${app.date}`);
@@ -128,7 +128,7 @@ export function renderFinancialReport(selectedPeriod = 'current-month') {
     });
 
     // Calculate stock movements with better categorization
-    db.stockMovements.forEach(movement => {
+    safeArray(db.stockMovements).forEach(movement => {
         const movementDate = new Date(movement.date);
         if (isNaN(movementDate.getTime())) {
             console.warn(`Invalid movement date for movement ${movement.id}: ${movement.date}`);
@@ -150,7 +150,7 @@ export function renderFinancialReport(selectedPeriod = 'current-month') {
     // Calculate daily notes financial impact and counts
     let additionalRevenueFromNotes = 0;
     let additionalExpensesFromNotes = 0;
-    db.dailyNotes.forEach(note => {
+    safeArray(db.dailyNotes).forEach(note => {
         const noteDate = new Date(note.date);
         if (isNaN(noteDate.getTime())) {
             console.warn(`Invalid daily note date for note ${note.id}: ${note.date}`);
@@ -175,7 +175,7 @@ export function renderFinancialReport(selectedPeriod = 'current-month') {
     const netResult = totalRevenue - totalExpenses;
     
     // Calculate schedules for the period
-    db.schedules.forEach(schedule => {
+    safeArray(db.schedules).forEach(schedule => {
         const scheduleDate = new Date(schedule.date);
         if (isNaN(scheduleDate.getTime())) {
             console.warn(`Invalid schedule date for schedule ${schedule.id}: ${schedule.date}`);
@@ -187,11 +187,11 @@ export function renderFinancialReport(selectedPeriod = 'current-month') {
     });
 
     // Update summary cards with clearer terminology
-    setText(document.getElementById('monthly-revenue'), `R$ ${totalRevenue.toFixed(2).replace('.', ',')}`);
+    setText(document.getElementById('monthly-revenue'), `R$ ${fmtMoney(totalRevenue).replace('.', ',')}`);
     setText(document.getElementById('monthly-appointments'), totalAppointmentsInPeriod);
-    setText(document.getElementById('stock-entries-value'), `R$ ${totalStockPurchases.toFixed(2).replace('.', ',')}`);
-    setText(document.getElementById('stock-exits-value'), `R$ ${totalMaterialsCost.toFixed(2).replace('.', ',')}`);
-    setText(document.getElementById('net-result'), `R$ ${netResult.toFixed(2).replace('.', ',')}`);
+    setText(document.getElementById('stock-entries-value'), `R$ ${fmtMoney(totalStockPurchases).replace('.', ',')}`);
+    setText(document.getElementById('stock-exits-value'), `R$ ${fmtMoney(totalMaterialsCost).replace('.', ',')}`);
+    setText(document.getElementById('net-result'), `R$ ${fmtMoney(netResult).replace('.', ',')}`);
     setText(document.getElementById('active-clients'), db.clients.length);
     setText(document.getElementById('total-schedules'), totalSchedulesInPeriod);
     
@@ -235,12 +235,12 @@ function renderFinancialDetails(startDate, endDate) {
 
     let clientsWithActivityInPeriod = false;
 
-    db.clients.forEach(client => {
+    safeArray(db.clients).forEach(client => {
         let clientAppointmentsValue = 0;
         let clientAppointmentsCount = 0;
         
         // Filter appointments for the selected month/year
-        (client.appointments || []).forEach(app => {
+        safeArray(client.appointments || []).forEach(app => {
             const appDate = new Date(app.date);
             if ((!startDate || appDate >= startDate) && (!endDate || appDate <= endDate)) {
                 clientAppointmentsValue += (app.value || 0);
@@ -260,7 +260,7 @@ function renderFinancialDetails(startDate, endDate) {
                     <div class="metric-item">
                         <i class="fa-solid fa-money-bill-wave"></i>
                         <span>Gasto no Período</span>
-                        <strong>R$ ${clientAppointmentsValue.toFixed(2).replace('.', ',')}</strong>
+                        <strong>R$ ${fmtMoney(clientAppointmentsValue).replace('.', ',')}</strong>
                     </div>
                     <div class="metric-item">
                         <i class="fa-solid fa-calendar-check"></i>
@@ -334,7 +334,7 @@ export function renderDailyNotes(selectedPeriod = 'current-month') {
     // Sort notes by date (newest first)
     const sortedNotes = [...filteredNotes].sort((a, b) => new Date(b.date) - new Date(a.date));
     
-    sortedNotes.forEach(note => {
+    safeArray(sortedNotes).forEach(note => {
         const noteCard = document.createElement('div');
         noteCard.className = `daily-note-card ${note.type}`;
         
@@ -366,7 +366,7 @@ export function renderDailyNotes(selectedPeriod = 'current-month') {
                 <div class="note-meta">
                     <span class="note-date">${new Date(note.date).toLocaleDateString('pt-BR')}</span>
                     <span class="note-type-badge ${note.type}">${typeLabel[note.type]}</span>
-                    ${note.value !== null ? `<span class="note-value">R$ ${note.value.toFixed(2).replace('.', ',')}</span>` : ''}
+                    ${note.value !== null ? `<span class="note-value">R$ ${fmtMoney(note.value).replace('.', ',')}</span>` : ''}
                 </div>
             </div>
             <div class="note-content">

@@ -23,7 +23,7 @@ export function renderStockList() {
     
     // Group items by category
     const categories = {};
-    safeArray(db.stockItems).forEach(item => {
+    db.stockItems.forEach(item => {
         if (!categories[item.category]) {
             categories[item.category] = [];
         }
@@ -47,7 +47,7 @@ export function renderStockList() {
         return nameA.localeCompare(nameB);
     });
 
-    safeArray(sortedCategoryKeys).forEach(category => {
+    sortedCategoryKeys.forEach(category => {
         const categorySection = document.createElement('div');
         categorySection.className = 'stock-category';
         
@@ -86,7 +86,7 @@ export function renderStockList() {
         // Sort items within each category by name
         const sortedItemsInCategory = [...categories[category]].sort((a, b) => a.name.localeCompare(b.name));
 
-        safeArray(sortedItemsInCategory).forEach(item => {
+        sortedItemsInCategory.forEach(item => {
             const itemCard = document.createElement('div');
             itemCard.id = `stock-item-card-${item.id}`; // Add ID for global search
             
@@ -123,8 +123,8 @@ export function renderStockList() {
                     ${item.description ? `<p class="stock-description">${item.description}</p>` : ''}
                     <div class="stock-meta">
                         <small>Estoque mínimo: ${item.minStock} unidades</small>
-                        <small>Valor unitário: R$ ${fmtMoney(item.unitValue).replace('.', ',')}</small>
-                        <small>Valor total para ${displayQuantity} unidades: R$ ${fmtMoney(item.quantity * item.unitValue).replace('.', ',')}</small>
+                        <small>Valor unitário: R$ ${item.unitValue.toFixed(2).replace('.', ',')}</small>
+                        <small>Valor total para ${displayQuantity} unidades: R$ ${(item.quantity * item.unitValue).toFixed(2).replace('.', ',')}</small>
                         ${isLowStock && !isOutOfStock ? `<span class="stock-deficit">Faltam ${item.minStock - item.quantity} unidades para atingir o mínimo.</span>` : ''}
                     </div>
                 </div>
@@ -181,7 +181,7 @@ export function renderStockMovements(selectedMonthYear = null) {
     let monthEntriesValue = 0;
     let monthExitsValue = 0;
     
-    safeArray(filteredMovements).forEach(movement => {
+    filteredMovements.forEach(movement => {
         const movementValue = (movement.quantity || 0) * (movement.itemUnitValue || 0);
         if (movement.type === 'entrada') {
             monthEntries++;
@@ -205,17 +205,17 @@ export function renderStockMovements(selectedMonthYear = null) {
                 <div class="summary-item entrada">
                     <span class="summary-label">📥 Entradas</span>
                     <span class="summary-count">${monthEntries} movimentações</span>
-                    <span class="summary-value">R$ ${fmtMoney(monthEntriesValue).replace('.', ',')}</span>
+                    <span class="summary-value">R$ ${monthEntriesValue.toFixed(2).replace('.', ',')}</span>
                 </div>
                 <div class="summary-item saida">
                     <span class="summary-label">📤 Saídas</span>
                     <span class="summary-count">${monthExits} movimentações</span>
-                    <span class="summary-value">R$ ${fmtMoney(monthExitsValue).replace('.', ',')}</span>
+                    <span class="summary-value">R$ ${monthExitsValue.toFixed(2).replace('.', ',')}</span>
                 </div>
                 <div class="summary-item total">
                     <span class="summary-label">💰 Saldo Líquido</span>
                     <span class="summary-count">${monthEntries + monthExits} total</span>
-                    <span class="summary-value">R$ ${fmtMoney(monthEntriesValue - monthExitsValue).replace('.', ',')}</span>
+                    <span class="summary-value">R$ ${(monthEntriesValue - monthExitsValue).toFixed(2).replace('.', ',')}</span>
                 </div>
             </div>
         `;
@@ -232,14 +232,14 @@ export function renderStockMovements(selectedMonthYear = null) {
     }
     
     const displayLimit = selectedMonthYear ? sortedMovements.length : 20;
-    safeArray(sortedMovements.slice(0, displayLimit)).forEach(movement => { // Show all movements for selected month, last 20 for all
+    sortedMovements.slice(0, displayLimit).forEach(movement => { // Show all movements for selected month, last 20 for all
         const movementCard = document.createElement('div');
         movementCard.className = `stock-movement-card ${movement.type}`;
         
         // Display quantity correctly, assuming all quantities are now in 'unidade'
         const displayQuantity = movement.quantity;
         const displayUnit = 'unidade';
-        const movementValue = fmtMoney(movement.quantity * (movement.itemUnitValue || 0)).replace('.', ',');
+        const movementValue = (movement.quantity * (movement.itemUnitValue || 0)).toFixed(2).replace('.', ',');
         
         let typeText = '';
         let typeClass = '';
@@ -304,19 +304,19 @@ export function updateStockSummary() {
     const lowStockAlertCard = document.querySelector('.low-stock-alert-card');
 
     if (totalItemsElement) {
-        totalItemsElement.textContent = String(totalItems);
+        totalItemsElement.textContent = totalItems;
     }
     
     if (lowStockItemsElement) {
-        lowStockItemsElement.textContent = String(lowStockItems + outOfStockItems); // Count both low and out of stock
+        lowStockItemsElement.textContent = lowStockItems + outOfStockItems; // Count both low and out of stock
     }
 
     if (totalStockValueElement) {
-        totalStockValueElement.textContent = `R$ ${fmtMoney(totalStockValue).replace('.', ',')}`;
+        totalStockValueElement.textContent = `R$ ${totalStockValue.toFixed(2).replace('.', ',')}`;
     }
 
     if (totalCategoriesElement) {
-        totalCategoriesElement.textContent = String(totalCategories);
+        totalCategoriesElement.textContent = totalCategories;
     }
     
     // Update summary card colors based on stock status

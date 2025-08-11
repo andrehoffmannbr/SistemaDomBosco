@@ -2068,7 +2068,6 @@
     <script type="module" src="./js/forms.js"></script>
     <script type="module" src="./js/mural.js"></script>
     <script type="module" src="./js/notifications.js"></script>
-    <script type="module" src="./js/funcionarios.js"></script>
     <!-- Sempre por último -->
     <script type="module" src="./js/main.js"></script>
 </body>

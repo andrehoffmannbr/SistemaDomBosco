@@ -91,7 +91,7 @@ export function renderClientList(filter = '', activityFilter = 'all', profession
         return;
     }
 
-    filteredClients.forEach(client => {
+    safeArray(filteredClients).forEach(client => {
         const card = document.createElement('div');
         card.className = 'client-card';
         card.dataset.clientId = client.id;
@@ -356,7 +356,7 @@ function renderAppointmentHistory(appointments) {
                 <p><strong><i class="fa-solid fa-clipboard-list"></i> Sessão/Serviço:</strong> ${anamnesis ? anamnesis.name : (app.serviceType || 'Não especificado')}</p>
                 <p><strong><i class="fa-solid fa-user-md"></i> Atendido por:</strong> ${app.attendedBy || 'Não informado'}</p>
                 ${app.notes ? `<p><strong><i class="fa-solid fa-sticky-note"></i> Notas:</strong> ${app.notes}</p>` : ''}
-                ${app.value !== undefined ? `<p><strong><i class="fa-solid fa-dollar-sign"></i> Valor:</strong> R$ ${(app.value || 0).toFixed(2).replace('.', ',')}</p>` : ''}
+                ${app.value !== undefined ? `<p><strong><i class="fa-solid fa-dollar-sign"></i> Valor:</strong> R$ ${fmtMoney(app.value || 0).replace('.', ',')}</p>` : ''}
                 ${app.durationHours !== undefined ? `<p><strong><i class="fa-solid fa-clock"></i> Duração:</strong> ${formatDuration(app.durationHours)}</p>` : ''}
             </div>
             ${attachmentsHtml}
@@ -544,7 +544,7 @@ export function renderMeusPacientes(filter = '') {
         return;
     }
     
-    filteredClients.forEach(client => {
+    safeArray(filteredClients).forEach(client => {
         const card = document.createElement('div');
         card.className = 'client-card';
         card.dataset.clientId = client.id;
@@ -922,7 +922,7 @@ function renderClientReportDetails(startDate, endDate, filter = '') {
         return;
     }
 
-    filteredClients.forEach(client => {
+    safeArray(filteredClients).forEach(client => {
         let totalAppointments = 0;
         let totalValue = 0;
         let periodAppointments = 0;
@@ -1018,12 +1018,12 @@ function renderClientReportDetails(startDate, endDate, filter = '') {
                 <div class="metric-item">
                     <i class="fa-solid fa-money-bill-wave"></i>
                     <span>Valor (Período)</span>
-                    <strong>R$ ${periodValue.toFixed(2).replace('.', ',')}</strong>
+                    <strong>R$ ${fmtMoney(periodValue).replace('.', ',')}</strong>
                 </div>
                 <div class="metric-item">
                     <i class="fa-solid fa-dollar-sign"></i>
                     <span>Valor (Total)</span>
-                    <strong>R$ ${totalValue.toFixed(2).replace('.', ',')}</strong>
+                    <strong>R$ ${fmtMoney(totalValue).replace('.', ',')}</strong>
                 </div>
                 <div class="metric-item">
                     <i class="fa-solid fa-clock"></i>
@@ -1557,7 +1557,7 @@ export function generateClientReport(clientId, selectedPeriod) {
                 </div>
                 <div class="report-summary-item revenue">
                     <h4><i class="fa-solid fa-money-bill-wave"></i> Valor Total</h4>
-                    <div class="summary-value">R$ ${totalRevenueGenerated.toFixed(2).replace('.', ',')}</div>
+                    <div class="summary-value">R$ ${fmtMoney(totalRevenueGenerated).replace('.', ',')}</div>
                 </div>
             </div>
         </div>
@@ -1583,7 +1583,7 @@ export function generateClientReport(clientId, selectedPeriod) {
                                     <td>${app.anamnesisTypeId || (app.serviceType ? db.serviceNames[app.serviceType] : 'N/A')}</td>
                                     <td>${app.attendedBy || 'N/A'}</td>
                                     <td>${formatDuration(app.durationHours)}</td>
-                                    <td>R$ ${(app.value || 0).toFixed(2).replace('.', ',')}</td>
+                                    <td>R$ ${fmtMoney(app.value || 0).replace('.', ',')}</td>
                                 </tr>
                                 ${app.notes ? `
                                 <tr class="appointment-notes-row">
@@ -1764,7 +1764,7 @@ function generateEmployeeReport(employeeId, selectedPeriod) {
                 </div>
                 <div class="report-summary-item revenue">
                     <h4><i class="fa-solid fa-money-bill-wave"></i> Receita Gerada no Período</h4>
-                    <div class="summary-value">R$ ${totalRevenueGenerated.toFixed(2).replace('.', ',')}</div>
+                    <div class="summary-value">R$ ${fmtMoney(totalRevenueGenerated).replace('.', ',')}</div>
                 </div>
             </div>
         </div>
@@ -1788,7 +1788,7 @@ function generateEmployeeReport(employeeId, selectedPeriod) {
                                     <td>${new Date(app.date).toLocaleDateString('pt-BR', {timeZone: 'UTC'})}</td>
                                     <td>${app.clientName}</td>
                                     <td>${formatDuration(app.durationHours)}</td>
-                                    <td>R$ ${(app.value || 0).toFixed(2).replace('.', ',')}</td>
+                                    <td>R$ ${fmtMoney(app.value || 0).replace('.', ',')}</td>
                                 </tr>
                             `).join('')}
                         </tbody>

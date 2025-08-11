@@ -1,5 +1,22 @@
 # CHANGELOG
 
+## [2025-08-11 18:45] — HOTFIX CONCLUÍDO ✅ (TypeError Prevention)
+**Resultado:** Sistema protegido contra TypeError de runtime
+- ✅ Helpers idempotentes funcionais (fmtMoney, safeArray, etc)
+- ✅ Todas .toFixed() → fmtMoney() (main.js, stock.js, financial.js, clients.js)  
+- ✅ Todas .forEach() → safeArray().forEach() nos arquivos críticos
+- ✅ funcionarios.js adicionado ao index.html (estava faltando)
+- ✅ Servidor teste: http://localhost:8000 ativo
+- ✅ Console limpo esperado - sem TypeError
+
+**Arquivos protegidos:** main.js, stock.js, financial.js, clients.js, index.html
+
+## [2025-08-11 18:38] — Hotfix estabilidade (toFixed/forEach/DOM)
+- Backups em /backup
+- Inseridos helpers idempotentes (num/fmtMoney/fmtInt/safeArray/safeEl)
+- Trocas cirúrgicas de .toFixed() e .forEach para null-safety
+- Sem mudanças de lógica/UX
+
 ## [2025-08-11 - Correção Final "already been declared"] 
 **Eliminação definitiva de redeclarações:**
 - ✅ Removida duplicata `isUserRoleIn` em auth.js (linha 129)
