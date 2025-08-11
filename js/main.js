@@ -41,9 +41,6 @@ function logoutUser() {
     showNotification('Você foi desconectado(a) devido à inatividade.', 'info', 'Inatividade', 7000);
 }
 
-// Helper para verificar se estamos em uma página específica
-const onPage = (sel) => !!document.querySelector(sel);
-
 // Make necessary functions globally available for onclicks or direct access
 window.showClientDetails = showClientDetails;
 window.updateScheduleStatus = updateScheduleStatus;

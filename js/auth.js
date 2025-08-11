@@ -125,15 +125,6 @@ export function getCurrentUser() {
   catch { return null; }
 }
 
-// NOVO helper: checa se o usuário atual tem uma role específica ou está em uma lista de roles
-export function isUserRoleIn(allowedRoles) {
-  const user = getCurrentUser();
-  if (!user) return false;
-  return Array.isArray(allowedRoles)
-    ? allowedRoles.includes(user.role)
-    : user.role === allowedRoles;
-}
-
 // Mantém a assinatura pública esperada pela UI (NÃO REMOVER)
 export function isRoleAllowed(section, action = 'view') {
   return checkTabAccess(section, action);

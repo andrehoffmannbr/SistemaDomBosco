@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## [2025-08-11 - Correção Final "already been declared"] 
+**Eliminação definitiva de redeclarações:**
+- ✅ Removida duplicata `isUserRoleIn` em auth.js (linha 129)
+- ✅ Removida duplicata `onPage` em main.js (linha 45)  
+- ✅ Mantidos guards globais para todas as funções
+- ✅ Ordem de carregamento validada (auth.js → outros → main.js)
+- ✅ Imports corretos em todos os arquivos
+
+**Status:** Pronto para testes - console limpo esperado
+
 ## [2025-08-10 - Guarda Global + Ordem Canônica Scripts] 
 **Correções finais para "already been declared":**
 - ✅ Helpers com guarda global via `globalThis` (auth.js e main.js)
