@@ -1,5 +1,17 @@
 # CHANGELOG
 
+## [2025-08-11 18:50] — Hotfix Estoque (STOCK_MANAGERS) ✅
+- ✅ Removido uso de constante legada STOCK_MANAGERS em js/stock.js
+- ✅ Permissões agora usam checkTabAccess/isSuperUser centralizados (auth.js)
+- ✅ Guards adicionados em renderizações do estoque para evitar uncaught
+- ✅ Blindagem completa da UI do estoque contra erros de permissão
+- ✅ Função canSeeStock() criada com bypass para admins/diretores
+- ✅ Todas funções CRUD protegidas (addStockItem, updateStock, deleteStockItem)
+- ✅ updateStockSummary() blindado em main.js (não trava UI)
+- ✅ Ordem de scripts validada (auth.js → stock.js → main.js)
+
+**Resultado:** Sistema sem ReferenceError: STOCK_MANAGERS is not defined
+
 ## [2025-08-11 18:45] — HOTFIX CONCLUÍDO ✅ (TypeError Prevention)
 **Resultado:** Sistema protegido contra TypeError de runtime
 - ✅ Helpers idempotentes funcionais (fmtMoney, safeArray, etc)

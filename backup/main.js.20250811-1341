@@ -186,7 +186,7 @@ async function bootApp() {
 
 document.addEventListener('DOMContentLoaded', bootApp);
 
-async function initializeApp() {
+function initializeApp() {
     updateCurrentDate();
     initializeCalendar();
     initScheduleView(); // Initialize agenda view, including the professional filter
@@ -232,7 +232,7 @@ async function initializeApp() {
     if (checkTabAccess('estoque', 'view')) {
         renderStockList();
         renderStockMovements();
-        updateStockSummary().catch(() => { /* não travar a UI */ });
+        updateStockSummary();
     }
     if (checkTabAccess('relatorios', 'view')) { renderClientReport(); }
     if (checkTabAccess('funcionarios', 'view')) { renderFuncionarioList(); }
@@ -343,7 +343,7 @@ function setupEventListeners() {
             if (result && result.user) {
                 document.getElementById('form-login').reset();
                 showMainApp();
-                await initializeApp();
+                initializeApp();
                 checkNotifications(); 
                 resetIdleTimer(); // Start idle timer on successful login
             } else {
@@ -423,7 +423,7 @@ function setupEventListeners() {
             } else if (tabId === 'estoque') {
                 renderStockList();
                 renderStockMovements();
-                updateStockSummary().catch(() => { /* não travar a UI */ });
+                updateStockSummary();
             } else if (tabId === 'meus-pacientes') {
                 renderMeusPacientes();
             } else if (tabId === 'funcionarios') {
@@ -721,7 +721,7 @@ function setupEventListeners() {
                     showNotification('Item excluído do estoque com sucesso!', 'success');
                     renderStockList();
                     renderStockMovements();
-                    updateStockSummary().catch(() => { /* não travar a UI */ });
+                    updateStockSummary();
                 } catch (error) {
                     showNotification('Erro ao excluir item: ' + error.message, 'error');
                 }
@@ -1133,7 +1133,7 @@ async function init() {
                 // Sucesso: auth.js já chama hydrateAll()
                 showNotification('Login efetuado com sucesso.', 'success');
                 showMainApp();
-                await initializeApp();
+                initializeApp();
                 checkNotifications(); 
                 resetIdleTimer();
             } catch (err) {
@@ -1526,7 +1526,7 @@ async function saveAttendanceConfirmation() {
         if (checkTabAccess('estoque', 'view') || checkTabAccess('financeiro', 'view')) {
             renderStockList();
             renderStockMovements();
-            updateStockSummary().catch(() => { /* não travar a UI */ });
+            updateStockSummary();
             const selectedPeriod = document.getElementById('financial-period-selector').value;
             renderFinancialReport(selectedPeriod);
         }
@@ -1636,7 +1636,7 @@ async function handleAddStockItem() {
         document.getElementById('modal-add-stock').style.display = 'none';
         renderStockList();
         renderStockMovements();
-        updateStockSummary().catch(() => { /* não travar a UI */ });
+        updateStockSummary();
         const selectedPeriod = document.getElementById('financial-period-selector').value;
         renderFinancialReport(selectedPeriod);
         showNotification('Item adicionado ao estoque com sucesso!', 'success');

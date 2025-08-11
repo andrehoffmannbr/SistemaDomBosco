@@ -1,26 +1,15 @@
 // Stock management module
 import { supabase, getUser } from '../lib/supabaseClient.js';
 import { db, hydrate } from './database.js';
-import { getCurrentUser, checkTabAccess, isSuperUser } from './auth.js';
+import { getCurrentUser, checkTabAccess } from './auth.js';
 import { addColumnIfExists } from './utils.js';
 
-// Guard util para estoque: usa tab_access OU bypass admin
-async function canSeeStock() {
-  try {
-    if (typeof isSuperUser === 'function' && isSuperUser()) return true;
-    if (typeof checkTabAccess === 'function') {
-      return await checkTabAccess('estoque', 'view');
-    }
-  } catch (_) {}
-  return false;
-}
-
-export async function renderStockList() {
+export function renderStockList() {
     const stockList = document.getElementById('stock-list');
     if (!stockList) return;
     
-    // Usar canSeeStock com bypass admin
-    if (!(await canSeeStock())) {
+    // Usar checkTabAccess centralizado
+    if (!checkTabAccess('estoque', 'view')) {
         stockList.innerHTML = '<p>Você não tem permissão para visualizar o estoque.</p>';
         return;
     }
@@ -160,12 +149,12 @@ export async function renderStockList() {
     });
 }
 
-export async function renderStockMovements(selectedMonthYear = null) {
+export function renderStockMovements(selectedMonthYear = null) {
     const stockMovements = document.getElementById('stock-movements');
     if (!stockMovements) return;
 
-    // Usar canSeeStock com bypass admin
-    if (!(await canSeeStock())) {
+    // Usar checkTabAccess centralizado
+    if (!checkTabAccess('estoque', 'view')) {
         stockMovements.innerHTML = '<p>Você não tem permissão para visualizar movimentações de estoque.</p>';
         return;
     }
@@ -296,16 +285,9 @@ export async function renderStockMovements(selectedMonthYear = null) {
     });
 }
 
-export async function updateStockSummary() {
+export function updateStockSummary() {
     // Only Director and Finance can view stock summary
-    const allowed = await canSeeStock();
-    if (!allowed) {
-        // Não quebra a UI: apenas limpa os cards/resumos
-        const elements = ['total-items', 'low-stock-items', 'total-stock-value', 'total-categories'];
-        elements.forEach(id => {
-            const el = document.getElementById(id);
-            if (el) el.textContent = '—';
-        });
+    if (!isUserRoleIn(STOCK_MANAGERS)) {
         return;
     }
 
@@ -349,7 +331,7 @@ export async function updateStockSummary() {
 
 export async function adjustStock(itemId, action) {
     // Only Director and Finance can adjust stock
-    if (!(await canSeeStock())) { 
+    if (!isUserRoleIn(STOCK_MANAGERS)) { 
         showNotification('Você não tem permissão para ajustar o estoque.', 'error'); 
         return; 
     }
@@ -391,7 +373,7 @@ export async function adjustStock(itemId, action) {
 
 // NEW: Update stock function
 export async function updateStock(itemId, quantity, reason, action = 'adjustment') {
-    if (!(await canSeeStock())) {
+    if (!checkTabAccess('estoque', 'edit')) {
         showNotification('Você não tem permissão para atualizar o estoque.', 'error');
         return;
     }
@@ -466,8 +448,12 @@ export function showDeleteStockItemConfirmation(itemId) {
 
 // [B4] NEW: Add stock item function (migrated from main.js)
 export async function addStockItem(item) {
-    if (!(await canSeeStock())) throw new Error('Sem permissão para estoque');
     try {
+        // Verificação de permissão centralizada
+        if (!checkTabAccess('stock','edit')) {
+            throw new Error('Sem permissão para editar estoque.');
+        }
+        
         const user = await getUser();
         if (!user) throw new Error('Usuário não autenticado');
 
@@ -534,8 +520,12 @@ export async function addStockItem(item) {
 
 // [B4] NEW: Delete stock item function
 export async function deleteStockItem(itemId) {
-    if (!(await canSeeStock())) throw new Error('Sem permissão para estoque');
     try {
+        // Verificação de permissão centralizada
+        if (!checkTabAccess('stock','delete')) {
+            throw new Error('Sem permissão para deletar itens do estoque.');
+        }
+        
         // RLS: só dono ou admin consegue deletar item. Movements caem por ON DELETE CASCADE.
         const { error } = await supabase.from('stock_items').delete().eq('id', itemId);
         if (error) throw error;
