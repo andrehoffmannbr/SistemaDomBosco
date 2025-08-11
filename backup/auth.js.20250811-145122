@@ -27,8 +27,7 @@ export const checkTabAccess = (globalThis.checkTabAccess ??=
     if (!role) return false;
     if (isSuperUser(role)) return true; // bypass admin
     const access = u?.tabAccess?.[tab];
-    // Fallback seguro: se não houver config para a aba, 'view' = allow, 'edit' = deny
-    if (!access) return action === 'view';
+    if (!access) return false;
     if (action === 'edit') {
       return access === 'Editar' || access === 'Ver e Editar' || access === 'edit';
     }
@@ -36,13 +35,6 @@ export const checkTabAccess = (globalThis.checkTabAccess ??=
     return access === 'Ver' || access === 'Editar' || access === 'Ver e Editar' || access === 'view' || access === 'edit';
   });
 // ===== END PERMISSIONS — SINGLE SOURCE =====
-
-// Helpers opcionais para reduzir erro de uso:
-export const roleOf = () => {
-  try { return (globalThis.getCurrentUser?.() || JSON.parse(localStorage.getItem('currentUser')||'null'))?.role ?? null; }
-  catch { return null; }
-};
-export const hasRoleIn = (set) => isUserRoleIn(roleOf(), set);
 
 // New: Role-based access control helper constants
 // These constants define the roles allowed for different features/tabs.

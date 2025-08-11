@@ -1,5 +1,47 @@
 # CHANGELOG
 
+## [2025-08-11 16:10] — Hotfix Navegação (tabs)
+- js/main.js: troca de safeArray(querySelectorAll('.tab-button')) por Array.from(querySelectorAll('.tab-button'))
+- Motivo: NodeList ≠ Array; safeArray devolvia [], impedindo o binding dos listeners
+
+## [2025-08-11 16:05] — Hotfix Sessão → Navegação
+- main.js: adicionada reidratação de currentUser a partir da sessão Supabase no boot
+- main.js: initializeApp garante currentUser antes de calcular menu/abas
+- Motivo: após reload com sessão ativa, tabs e renders dependiam de checkTabAccess, que falhava com usuário nulo
+
+## [2025-08-11 16:00] — Hotfix navegação: guards em main.js dropdown; _txt em clients.js; guard extra em ui.js; nenhum impacto em UX
+- main.js: null-safety no handler de click dropdown de notificações
+- clients.js: showClientDetails usa _txt() ao invés de textContent direto  
+- ui.js: guard extra button?.dataset?.tab no loop de botões
+- Sistema mais resiliente sem alterar comportamento visual
+
+## [2025-08-11 15:50] — Hotfix Navegação & Permissões (ui.js/clients.js/stock.js)
+- ui.js: showMainApp com null-safety (role = currentUser?.role)
+- clients.js: corrigidos todos isUserRoleIn para passar currentUser?.role como primeiro parâmetro
+- stock.js: canSeeStock com isSuperUser(getCurrentUser()?.role) ao invés de isSuperUser()
+- auth.js: helpers roleOf() e hasRoleIn() para facilitar uso futuro
+- Sistema agora funciona corretamente sem "Cannot read properties of null"
+
+## [2025-08-11 15:42] — Hotfix navegação + null-safety
+- ui.js: guards em showMainApp (DOM elements), switchTab resiliente, checkTabAccess com fallback
+- main.js: bindIfExists() helper, listeners seguros (form-login, notification-bell, btn-logout)  
+- main.js: tab navigation com querySelector seguro
+- Sistema blindado contra "Cannot read properties of null"
+
+## [2025-08-11 14:30] — Início: Guards de DOM + Navegação
+- Preparação para remover duplicatas de helpers e adicionar guards de navegação
+- main.js: removido bloco duplicado de helpers (fmtMoney único com toLocaleString)
+- clients.js: guards de container e uso consistente de setTextById via _txt()
+- ui.js: switchTab com try/catch e guards (sem alterar UX)
+- auth.js: checkTabAccess com bypass admin e fallback "allow view" quando sem config
+
+## [2025-08-11 19:05] — Hotfix Navegação + Null-Safety
+- main.js: helpers globais (el, setTextById, setValueById, safeArray, safeNum, fmtMoney, onPage)
+- main.js: initializeApp resiliente via safeInit + guards de página
+- clients.js: renderClientReport com early-return + null-safety + números sanados
+- stock.js: remoção de STOCK_MANAGERS; canSeeStock() centralizado; null/number safety
+- financial.js: early-return + null/number safety
+
 ## [2025-08-11 18:50] — Hotfix Estoque (STOCK_MANAGERS) ✅
 - ✅ Removido uso de constante legada STOCK_MANAGERS em js/stock.js
 - ✅ Permissões agora usam checkTabAccess/isSuperUser centralizados (auth.js)

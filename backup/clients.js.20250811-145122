@@ -26,7 +26,7 @@ export function renderClientList(filter = '', activityFilter = 'all', profession
     // Roles like 'director', 'coordinator_madre', 'coordinator_floresta', 'receptionist' are not part of PROFESSIONAL_ROLES,
     // so for them, the `clientsToShow` array will remain `db.clients` (all clients),
     // which aligns with the requirement for 'director' and 'receptionist' to see all patients.
-    if (isUserRoleIn(currentUser?.role, PROFESSIONAL_ROLES) && !isUserRoleIn(currentUser?.role, ALL_ADMIN_VIEW_CLIENTS_AND_EMPLOYEES)) {
+    if (isUserRoleIn(PROFESSIONAL_ROLES) && !isUserRoleIn(ALL_ADMIN_VIEW_CLIENTS_AND_EMPLOYEES)) {
         clientsToShow = clientsToShow.filter(client => 
             client.assignedProfessionalIds && client.assignedProfessionalIds.includes(currentUser.id)
         );
@@ -54,7 +54,7 @@ export function renderClientList(filter = '', activityFilter = 'all', profession
     // Apply professional filter based on `assignedProfessionalIds`
     // This filter is only meaningful for roles that can see *all* clients and then filter them,
     // i.e., Director, Coordinators, and Receptionists. For professionals, the initial filtering already handled this.
-    if (!isUserRoleIn(currentUser?.role, PROFESSIONAL_ROLES) || isUserRoleIn(currentUser?.role, ALL_ADMIN_VIEW_CLIENTS_AND_EMPLOYEES)) {
+    if (!isUserRoleIn(PROFESSIONAL_ROLES) || isUserRoleIn(ALL_ADMIN_VIEW_CLIENTS_AND_EMPLOYEES)) {
         if (professionalFilter === 'linked') {
             filteredClients = filteredClients.filter(client => 
                 client.assignedProfessionalIds && client.assignedProfessionalIds.length > 0
@@ -145,10 +145,6 @@ export function renderClientList(filter = '', activityFilter = 'all', profession
 }
 
 export function showClientDetails(clientId) {
-    // Evita quebras quando modal/elementos não existem na aba atual
-    const modal = document.getElementById('modal-detalhes-cliente');
-    if (!modal) return;
-    
     const client = db.clients.find(c => c.id === clientId);
     if (!client) return;
 
@@ -169,31 +165,31 @@ export function showClientDetails(clientId) {
     `;
     
     if (client.type === 'adult') {
-        _txt('modal-email-cliente', client.email || 'N/A');
-        _txt('modal-telefone-cliente', client.phone || 'N/A');
-        _txt('modal-cpf-cliente', client.cpf || 'N/A');
-        _txt('modal-responsavel-cliente', client.contatoEmergencia || 'N/A');
+        document.getElementById('modal-email-cliente').textContent = client.email || 'N/A';
+        document.getElementById('modal-telefone-cliente').textContent = client.phone || 'N/A';
+        document.getElementById('modal-cpf-cliente').textContent = client.cpf || 'N/A';
+        document.getElementById('modal-responsavel-cliente').textContent = client.contatoEmergencia || 'N/A';
     } else {
-        _txt('modal-email-cliente', 'N/A (Menor de idade)');
-        _txt('modal-telefone-cliente', `Pais: ${client.telefonePai || 'N/A'} / ${client.telefoneMae || 'N/A'}`);
-        _txt('modal-cpf-cliente', 'N/A (Menor de idade)');
-        _txt('modal-responsavel-cliente', `${client.nomePai || ''} / ${client.nomeMae || ''}`);
+        document.getElementById('modal-email-cliente').textContent = 'N/A (Menor de idade)';
+        document.getElementById('modal-telefone-cliente').textContent = `Pais: ${client.telefonePai || 'N/A'} / ${client.telefoneMae || 'N/A'}`;
+        document.getElementById('modal-cpf-cliente').textContent = 'N/A (Menor de idade)';
+        document.getElementById('modal-responsavel-cliente').textContent = `${client.nomePai || ''} / ${client.nomeMae || ''}`;
     }
     
-    _txt('modal-data-nascimento', client.birthDate ? new Date(client.birthDate).toLocaleDateString('pt-BR', {timeZone: 'UTC'}) : 'N/A');
-    _txt('modal-cep-cliente', client.cep || 'N/A');
-    _txt('modal-logradouro-cliente', client.address || 'N/A');
-    _txt('modal-numero-cliente', client.number || 'S/N');
-    _txt('modal-bairro-cliente', client.neighborhood || '');
-    _txt('modal-cidade-estado-cliente', `${client.city || ''} / ${client.state || ''}`);
-    _txt('modal-observacoes-cliente', client.observations || 'Nenhuma observação.');
+    document.getElementById('modal-data-nascimento').textContent = client.birthDate ? new Date(client.birthDate).toLocaleDateString('pt-BR', {timeZone: 'UTC'}) : 'N/A';
+    document.getElementById('modal-cep-cliente').textContent = client.cep || 'N/A';
+    document.getElementById('modal-logradouro-cliente').textContent = client.address || 'N/A';
+    document.getElementById('modal-numero-cliente').textContent = client.number || 'S/N';
+    document.getElementById('modal-bairro-cliente').textContent = client.neighborhood || '';
+    document.getElementById('modal-cidade-estado-cliente').textContent = `${client.city || ''} / ${client.state || ''}`;
+    document.getElementById('modal-observacoes-cliente').textContent = client.observations || 'Nenhuma observação.';
     
     // NEW: Display unit information
     const unitMap = {
         'madre': 'Clínica Social (Madre)',
         'floresta': 'Neuro (Floresta)'
     };
-    _txt('modal-unidade-cliente', unitMap[client.unit] || 'N/A');
+    document.getElementById('modal-unidade-cliente').textContent = unitMap[client.unit] || 'N/A';
     
     // NEW: Display clinical information if available
     const clinicalInfoSection = document.querySelector('.modal-obs');
@@ -253,7 +249,7 @@ export function showClientDetails(clientId) {
     const deleteClientButton = document.getElementById('btn-delete-client');
 
     if (deleteClientButton) {
-        if (checkTabAccess('historico', 'edit') && isUserRoleIn(getCurrentUser()?.role, DIRECTOR_ONLY)) { // Only Director can delete
+        if (checkTabAccess('historico', 'edit') && isUserRoleIn(DIRECTOR_ONLY)) { // Only Director can delete
             deleteClientButton.style.display = 'inline-flex';
         } else {
             deleteClientButton.style.display = 'none';
@@ -323,8 +319,6 @@ export function showClientDetails(clientId) {
 
 function renderAppointmentHistory(appointments) {
     const historicoContainer = document.getElementById('historico-atendimentos');
-    if (!historicoContainer) return; // guard: não renderiza se não estiver nesta aba
-    
     historicoContainer.innerHTML = '';
 
     if (!appointments || appointments.length === 0) {
@@ -486,7 +480,7 @@ export async function addClientNote(clientId, note) {
 // CLIENT DOCUMENTS (base64)
 export async function addClientDocument(clientId, doc) {
     // Check if current user is allowed to add documents
-    if (!(isUserRoleIn(getCurrentUser()?.role, ALL_ADMIN_VIEW_CLIENTS_AND_EMPLOYEES) || isUserRoleIn(getCurrentUser()?.role, PROFESSIONAL_ROLES))) {
+    if (!(isUserRoleIn(ALL_ADMIN_VIEW_CLIENTS_AND_EMPLOYEES) || isUserRoleIn(PROFESSIONAL_ROLES))) {
         showNotification('Você não tem permissão para anexar documentos a clientes.', 'error');
         return;
     }
@@ -531,7 +525,7 @@ export function deleteClientDocument(documentId) {
 
 export function renderMeusPacientes(filter = '') {
     const currentUser = getCurrentUser();
-    if (!isUserRoleIn(currentUser?.role, PROFESSIONAL_ROLES)) return; // Ensure only professionals can access this function
+    if (!isUserRoleIn(PROFESSIONAL_ROLES)) return; // Ensure only professionals can access this function
     
     const meusPacientesList = document.getElementById('meus-pacientes-list');
     if (!meusPacientesList) return;
@@ -580,12 +574,8 @@ export function renderMeusPacientes(filter = '') {
 }
 
 export function renderClientReport(selectedPeriod = 'all') {
-  // Guard: não renderiza se a seção não existir (evita null.textContent)
-  const root =
-    document.getElementById('client-report-container') ||
-    document.getElementById('client-list-container') ||
-    document.getElementById('relatorios-container');
-  if (!root) return;
+    // Retorna cedo se a seção não está visível nesta página
+    if (!document.getElementById('client-list-container')) return;
     
     // The role check for renderClientReport needs to be updated to match the tab visibility
     // If the tab is visible to ALL_ADMIN_VIEW_CLIENTS_AND_EMPLOYEES, then the report should render for them.
@@ -1202,7 +1192,7 @@ export function unassignProfessionalFromClient() {
 // NEW: Delete client (Coordinator only)
 // DELETE
 export async function deleteClient(id) {
-    if (!checkTabAccess('historico', 'edit') || !isUserRoleIn(getCurrentUser()?.role, DIRECTOR_ONLY)) { // Only Director can delete
+    if (!checkTabAccess('historico', 'edit') || !isUserRoleIn(DIRECTOR_ONLY)) { // Only Director can delete
         showNotification('Você não tem permissão para excluir clientes.', 'error');
         return;
     }

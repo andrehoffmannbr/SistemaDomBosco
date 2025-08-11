@@ -24,45 +24,15 @@ function safeInit(label, fn) {
   }
 }
 
-// Novo: binder seguro para listeners com fallback silencioso
-function bindIfExists(id, event, handler) {
-  const node = document.getElementById(id);
-  if (node && typeof node.addEventListener === 'function') {
-    node.addEventListener(event, handler);
-    return true;
-  }
-  return false;
-}
-
-// Reidrata currentUser no localStorage a partir de profiles (quando já existe sessão)
-async function rehydrateCurrentUserFromSession() {
-  try {
-    const session = await getSession();
-    const uid = session?.user?.id;
-    if (!uid) return false;
-    // Evita trabalho se já está populado
-    const cur = (() => { try { return JSON.parse(localStorage.getItem('currentUser')||'null'); } catch { return null; }})();
-    if (cur?.id === uid) return true;
-    // Busca profile e grava
-    const { data: profile } = await supabase.from('profiles').select('*').eq('id', uid).single();
-    if (!profile) return false;
-    const currentUser = {
-      id: profile.id,
-      name: profile.name,
-      role: profile.role,
-      email: profile.email,
-      phone: profile.phone,
-      tabAccess: profile.tab_access || {}
-    };
-    localStorage.setItem('currentUser', JSON.stringify(currentUser));
-    return true;
-  } catch (e) {
-    console.warn('[rehydrateCurrentUserFromSession] falhou:', e);
-    return false;
-  }
-}
-
-// (removido bloco duplicado de helpers — mantemos o primeiro bloco com toLocaleString)
+// ===== Helpers idempotentes (não mudam lógica) =====
+globalThis._num ??= (v) => (v === null || v === undefined || v === '' || Number.isNaN(+v) ? 0 : Number(v));
+globalThis.fmtMoney ??= (v, d = 2) => _num(v).toFixed(d);
+globalThis.fmtInt ??= (v) => String(Math.max(0, Math.trunc(_num(v))));
+globalThis.safeArray ??= (v) => (Array.isArray(v) ? v : []);
+globalThis.safeEl ??= (id) => document.getElementById(id) || null;
+globalThis.setTextById ??= (id, text = '') => { const el = safeEl(id); if (el) el.textContent = String(text); };
+globalThis.setValueById ??= (id, val = '') => { const el = safeEl(id); if (el) el.value = String(val); };
+// ==================================================== 
 import { renderClientList, showClientDetails, addClientNote, addClientDocument, deleteClientDocument, renderMeusPacientes, renderClientReport, showAssignProfessionalModal, assignProfessionalToClient, unassignProfessionalFromClient, deleteClient, duplicateClient, showEmployeeReport, showClientReportModal, generateClientReport } from './clients.js'; 
 import { renderSchedule, updateScheduleStatus, initializeCalendar, renderCalendar, saveEditedSchedule, cancelScheduleWithReason, reassignSchedule, populateAssignableUsers, serviceNames, editSchedule, saveReassignedSchedule, initScheduleView, addSchedule, deleteSchedule, confirmAttendance } from './schedule.js'; 
 import { renderFinancialReport, renderDailyNotes, addDailyNote, generateDetailedFinancialReport, downloadDailyNotes, deleteDailyNote } from './financial.js'; 
@@ -73,7 +43,14 @@ import { addGeneralDocument as addGeneralDocumentAPI, deleteGeneralDocument as d
 import { pushNotification, markNotificationRead, fetchMyNotifications } from './notifications.js';
 import { convertTimeToDecimalHours } from './utils.js'; 
 
-// (removido bloco duplicado — helpers já definidos no topo via globalThis.*)
+// ===== DOM HELPERS — SINGLE SOURCE (não duplicar) =====
+export const setTextById  = (globalThis.setTextById  ??=
+  (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v ?? ''; });
+export const setValueById = (globalThis.setValueById ??=
+  (id, v) => { const el = document.getElementById(id); if (el) el.value = v ?? ''; });
+export const onPage       = (globalThis.onPage       ??=
+  (id) => !!document.getElementById(id));
+// ===== END DOM HELPERS — SINGLE SOURCE ===== 
 
 // --- Inactivity Logout Variables ---
 let idleTimeout;
@@ -210,11 +187,12 @@ function toast(msg, type='info') {
 async function bootApp() {
     populateDemoCredentials();
     const session = await getSession();
-    if (session?.user?.id) {
-        // 1) Reidrata currentUser para que checkTabAccess/governança funcionem após reload
-        await rehydrateCurrentUserFromSession();
-        // 2) Hidrata os dados
-        try { await hydrateAll(); } catch(e) { console.error('Falha na hidratação inicial:', e); }
+    if (session && session.user && session.user.id) {
+        try { 
+            await hydrateAll(); 
+        } catch(e) { 
+            console.error('Falha na hidratação inicial:', e); 
+        }
     }
     setupEventListeners();
     setupFormHandlers();
@@ -233,13 +211,10 @@ async function initializeApp() {
     initializeCalendar();
     initScheduleView(); // Initialize agenda view, including the professional filter
     
-    // Garante que currentUser exista (após reload + sessão)
-    const ok = getCurrentUser() || await rehydrateCurrentUserFromSession();
     // Renderiza o menu com permissões adequadas
     renderMenu();
     
     const currentUser = getCurrentUser();
-    console.log('[init] currentUser:', currentUser?.role, currentUser?.tabAccess ? 'tabAccess(ok)' : 'tabAccess(vazio)');
     
     // Determine initial tab based on user permissions
     let initialTab = 'cadastro'; // Default fallback
@@ -384,7 +359,7 @@ function setupEventListeners() {
     document.addEventListener('scroll', resetIdleTimer);
     // --- End Inactivity Logout Event Listeners ---
 
-    bindIfExists('form-login','submit', async (e) => {
+    document.getElementById('form-login').addEventListener('submit', async (e) => {
         e.preventDefault();
         const username = document.getElementById('username').value;
         const password = document.getElementById('password').value;
@@ -407,7 +382,7 @@ function setupEventListeners() {
     });
 
     // NEW: Notification Bell click handler
-    bindIfExists('notification-bell','click', () => {
+    document.getElementById('notification-bell').addEventListener('click', () => {
         const dropdown = document.getElementById('notification-dropdown');
         dropdown.classList.toggle('active');
 
@@ -424,34 +399,31 @@ function setupEventListeners() {
         }
     });
 
-    // Close dropdown if clicked outside (null-safe)
+    // Close dropdown if clicked outside
     document.addEventListener('click', (event) => {
         const bellWrapper = document.querySelector('.notification-bell-wrapper');
         const dropdown = document.getElementById('notification-dropdown');
-        if (!dropdown || !bellWrapper) return; // guard: elementos podem não existir nesta view
+        // Check if the dropdown is active and the click was outside the bell wrapper
         if (dropdown.classList.contains('active') && !bellWrapper.contains(event.target)) {
             dropdown.classList.remove('active');
             setTimeout(() => {
-                if (!dropdown.classList.contains('active')) {
-                    dropdown.style.display = 'none';
-                }
+                dropdown.style.display = 'none';
             }, 200);
         }
     });
 
-    bindIfExists('btn-logout','click', () => {
+    document.getElementById('btn-logout').addEventListener('click', () => {
         clearTimeout(idleTimeout); // Clear the idle timer on manual logout
         logout();
         showLoginScreen();
     });
 
     // Tab navigation
-    Array.from(document.querySelectorAll('.tab-button')).forEach(button => {
+    safeArray(document.querySelectorAll('.tab-button')).forEach(button => {
         button.addEventListener('click', () => {
             const tabId = button.dataset.tab;
-            if (!checkTabAccess(tabId, 'view')) {
-                const label = button.querySelector('span')?.textContent || tabId;
-                showNotification(`Você não tem permissão para acessar a aba "${label}".`, 'error');
+            if (!checkTabAccess(tabId, 'view')) { // Check if user has view permission for the clicked tab
+                showNotification(`Você não tem permissão para acessar a aba "${button.querySelector('span').textContent}".`, 'error');
                 return; // Prevent switching if no permission
             }
 

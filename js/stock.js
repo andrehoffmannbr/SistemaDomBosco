@@ -7,7 +7,7 @@ import { addColumnIfExists } from './utils.js';
 // Guard util para estoque: usa tab_access OU bypass admin
 async function canSeeStock() {
   try {
-    if (typeof isSuperUser === 'function' && isSuperUser()) return true;
+    if (typeof isSuperUser === 'function' && isSuperUser(getCurrentUser()?.role)) return true;
     if (typeof checkTabAccess === 'function') {
       return await checkTabAccess('estoque', 'view');
     }
@@ -16,8 +16,8 @@ async function canSeeStock() {
 }
 
 export async function renderStockList() {
+    if (!document.getElementById('stock-list')) return;
     const stockList = document.getElementById('stock-list');
-    if (!stockList) return;
     
     // Usar canSeeStock com bypass admin
     if (!(await canSeeStock())) {

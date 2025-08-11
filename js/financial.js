@@ -50,21 +50,22 @@ export async function deleteDailyNote(id) {
 }
 
 export function renderFinancialReport(selectedPeriod = 'current-month') {
+    if (!document.getElementById('financial-summary-grid')) return;
     // Admin bypass e controle de permissão centralizado
-    if (!checkTabAccess('financial','view')) {
+    if (!checkTabAccess('financeiro','view')) {
         const financialList = document.getElementById('financial-list');
         if (financialList) {
             financialList.innerHTML = '<p>Você não tem permissão para visualizar relatórios financeiros.</p>';
         }
-        // também zera, com null-safety, os elementos mais comuns
-        setText(document.getElementById('monthly-revenue'), 'R$ 0,00');
-        setText(document.getElementById('monthly-appointments'), '0');
-        setText(document.getElementById('stock-entries-value'), 'R$ 0,00');
-        setText(document.getElementById('stock-exits-value'), 'R$ 0,00');
-        setText(document.getElementById('net-result'), 'R$ 0,00');
-        setText(document.getElementById('active-clients'), '0');
-        setText(document.getElementById('total-schedules'), '0');
-        setText(document.getElementById('financial-period-display'), 'Acesso Restrito');
+        // também zera, com null-safety, os elementos mais comuns (usando helpers globais quando disponíveis)
+        (globalThis.setTextById ?? (()=>{}))('monthly-revenue', 'R$ 0,00');
+        (globalThis.setTextById ?? (()=>{}))('monthly-appointments', '0');
+        (globalThis.setTextById ?? (()=>{}))('stock-entries-value', 'R$ 0,00');
+        (globalThis.setTextById ?? (()=>{}))('stock-exits-value', 'R$ 0,00');
+        (globalThis.setTextById ?? (()=>{}))('net-result', 'R$ 0,00');
+        (globalThis.setTextById ?? (()=>{}))('active-clients', '0');
+        (globalThis.setTextById ?? (()=>{}))('total-schedules', '0');
+        (globalThis.setTextById ?? (()=>{}))('financial-period-display', 'Acesso Restrito');
         return;
     }
     
@@ -187,12 +188,12 @@ export function renderFinancialReport(selectedPeriod = 'current-month') {
     });
 
     // Update summary cards with clearer terminology
-    setText(document.getElementById('monthly-revenue'), `R$ ${fmtMoney(totalRevenue).replace('.', ',')}`);
-    setText(document.getElementById('monthly-appointments'), totalAppointmentsInPeriod);
-    setText(document.getElementById('stock-entries-value'), `R$ ${fmtMoney(totalStockPurchases).replace('.', ',')}`);
-    setText(document.getElementById('stock-exits-value'), `R$ ${fmtMoney(totalMaterialsCost).replace('.', ',')}`);
-    setText(document.getElementById('net-result'), `R$ ${fmtMoney(netResult).replace('.', ',')}`);
-    setText(document.getElementById('active-clients'), db.clients.length);
+    setTextById('monthly-revenue', `R$ ${fmtMoney(totalRevenue).replace('.', ',')}`);
+    setTextById('monthly-appointments', totalAppointmentsInPeriod);
+    setTextById('stock-entries-value', `R$ ${fmtMoney(totalStockPurchases).replace('.', ',')}`);
+    setTextById('stock-exits-value', `R$ ${fmtMoney(totalMaterialsCost).replace('.', ',')}`);
+    setTextById('net-result', `R$ ${fmtMoney(netResult).replace('.', ',')}`);
+    setTextById('active-clients', db.clients.length);
     setText(document.getElementById('total-schedules'), totalSchedulesInPeriod);
     
     // Update period display

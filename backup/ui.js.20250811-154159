@@ -8,18 +8,15 @@ export function showLoginScreen() {
 }
 
 export function showMainApp() {
-    const loginEl = document.getElementById('login-screen');
-    const appEl   = document.getElementById('app');
-    if (loginEl) loginEl.style.display = 'none';
-    if (appEl)   appEl.style.display   = 'block';
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
     
     // Update user info
-    const currentUser = (typeof getCurrentUser === 'function' ? getCurrentUser() : null) || null;
+    const currentUser = getCurrentUser?.() || null;
     const nameEl = document.getElementById('current-user-name');
     if (nameEl) nameEl.textContent = currentUser?.name ?? 'Usuário';
-    const role = currentUser?.role;  // ← evita acessar .role de null
     let roleText;
-    switch (role) {
+    switch (currentUser.role) {
         case 'director':
             roleText = 'Diretoria';
             break;
@@ -67,27 +64,25 @@ export function showMainApp() {
     
     // NEW LOGIC: Tab visibility using checkTabAccess
     (document.querySelectorAll('.tab-button') || []).forEach(button => {
-        const tabId = button?.dataset?.tab;
-        if (!tabId) return; // guard: botão sem data-tab não participa
-        let canView = false;
-        try { canView = !!checkTabAccess(tabId, 'view'); } catch(_) { canView = true; } // fallback: não esconder tudo
+        const tabId = button.dataset.tab;
+        const canView = checkTabAccess(tabId, 'view');
         button.style.display = canView ? 'flex' : 'none';
     });
 }
 
 export function switchTab(tabId) {
   try {
-    const contents = document.querySelectorAll('.tab-content') || [];
-    const buttons  = document.querySelectorAll('.tab-button')  || [];
-    contents.forEach(c => c && c.classList && c.classList.remove('active'));
-    buttons.forEach(b => b && b.classList && b.classList.remove('active'));
+    const contents = document.querySelectorAll('.tab-content');
+    const buttons  = document.querySelectorAll('.tab-button');
+    contents && contents.forEach(c => c && c.classList.remove('active'));
+    buttons  && buttons.forEach(b => b && b.classList.remove('active'));
 
     const target = document.getElementById(`tab-${tabId}`);
     if (!target) { console.warn('[switchTab] container não encontrado:', `tab-${tabId}`); return; }
     target.classList.add('active');
 
     const btn = document.querySelector(`[data-tab="${tabId}"]`);
-    if (btn && btn.classList) btn.classList.add('active');
+    if (btn) btn.classList.add('active');
   } catch(e) {
     console.error('[switchTab] erro:', e);
   }

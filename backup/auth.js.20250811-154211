@@ -37,13 +37,6 @@ export const checkTabAccess = (globalThis.checkTabAccess ??=
   });
 // ===== END PERMISSIONS — SINGLE SOURCE =====
 
-// Helpers opcionais para reduzir erro de uso:
-export const roleOf = () => {
-  try { return (globalThis.getCurrentUser?.() || JSON.parse(localStorage.getItem('currentUser')||'null'))?.role ?? null; }
-  catch { return null; }
-};
-export const hasRoleIn = (set) => isUserRoleIn(roleOf(), set);
-
 // New: Role-based access control helper constants
 // These constants define the roles allowed for different features/tabs.
 // 'financeiro' is intentionally excluded from all non-financial access groups.
