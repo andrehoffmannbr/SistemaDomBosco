@@ -7,7 +7,15 @@ import { formatDuration } from './utils.js'; // Import the new utility function
 import { pushNotification } from './notifications.js';
 
 // Helpers locais de segurança (não conflitam; usam globais se existirem)
-const _txt = (id, v) => (globalThis.setTextById ? setTextById(id, v) : (document.getElementById(id)?.textContent = (v ?? '') + ''));
+// Setter seguro de texto: evita optional chaining no lado esquerdo da atribuição
+const _txt = (id, v) => {
+  if (typeof globalThis.setTextById === 'function') {
+    return globalThis.setTextById(id, v);
+  }
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = (v ?? '') + '';
+};
 const _num = (v) => (globalThis.safeNum ? safeNum(v) : (Number.isFinite(+v) ? +v : 0));
 const _moe = (v) => (globalThis.fmtMoney ? fmtMoney(v) : _num(v).toFixed(2));
 

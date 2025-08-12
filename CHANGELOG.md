@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## [2025-08-12 09:15] — Hotfix de Login (clients.js)
+- Corrigido helper `_txt` para não usar optional chaining em atribuição (`?.textContent = ...`), que quebrava o parse do JS e impedia o login.
+- Alteração mínima, sem impacto em UX/lógica. Requer hard reload.
+
 ## [2025-08-11 16:10] — Hotfix Navegação (tabs)
 - js/main.js: troca de safeArray(querySelectorAll('.tab-button')) por Array.from(querySelectorAll('.tab-button'))
 - Motivo: NodeList ≠ Array; safeArray devolvia [], impedindo o binding dos listeners
