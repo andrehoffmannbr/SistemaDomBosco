@@ -163,6 +163,7 @@ export function renderSchedule(selectedDate = null) {
     }
 
     const isManager = isUserRoleIn(ALL_SCHEDULE_VIEW_EDIT_MANAGERS);
+    const isAdmin = currentUser?.role === 'admin';
     let professionalIdFilter = 'all';
     let unitFilter = 'all';
 
@@ -175,6 +176,7 @@ export function renderSchedule(selectedDate = null) {
     }
 
     // Filter schedules:
+    // ADMIN sees all schedules (RLS already handles this).
     // ALL_SCHEDULE_VIEW_EDIT_MANAGERS see all schedules.
     // Other PROFESSIONAL_ROLES only see schedules assigned to them.
     const daySchedules = db.schedules.filter(schedule => {
@@ -182,22 +184,29 @@ export function renderSchedule(selectedDate = null) {
 
         // Filter by unit
         if (unitFilter !== 'all') {
-            const client = db.clients.find(c => c.id === schedule.clientId);
+            const client = db.clients.find(c => c.id === schedule.client_id);
             if (!client || client.unit !== unitFilter) {
                 return false;
             }
         }
 
-        if (isManager) {
+        // Admin enxerga todos (RLS já permite, não filtre por usuário)
+        if (isAdmin) {
+            if (professionalIdFilter === 'all') {
+                return true; // Show all schedules for the day
+            } else {
+                return schedule.assigned_to_user_uid === professionalIdFilter;
+            }
+        } else if (isManager) {
             // Managers can filter by professional.
             if (professionalIdFilter === 'all') {
                 return true; // Show all schedules for the day
             } else {
-                return schedule.assignedToUserId === parseInt(professionalIdFilter);
+                return schedule.assigned_to_user_uid === professionalIdFilter;
             }
         } else {
             // Professionals who are not managers only see their own schedules.
-            return schedule.assignedToUserId === currentUser.id;
+            return schedule.assigned_to_user_uid === currentUser.id;
         }
         
     });
@@ -213,7 +222,7 @@ export function renderSchedule(selectedDate = null) {
     daySchedules.sort((a, b) => a.time.localeCompare(b.time));
     
     daySchedules.forEach(schedule => {
-        const client = db.clients.find(c => c.id === schedule.clientId);
+        const client = db.clients.find(c => c.id === schedule.client_id);
         
         let cancellationInfo = '';
         if (schedule.status === 'cancelado' && schedule.cancelReason) {
@@ -231,7 +240,7 @@ export function renderSchedule(selectedDate = null) {
 
         let buttonsHtml = '';
         const canEditAgenda = checkTabAccess('agenda', 'edit'); // Check for edit permission on agenda tab
-        const isAssignedProfessional = schedule.assignedToUserId === currentUser.id;
+        const isAssignedProfessional = schedule.assigned_to_user_uid === currentUser.id;
 
         if (schedule.status === 'agendado') {
             if (canEditAgenda) { // If user has edit access to agenda, they can do all actions
@@ -263,9 +272,9 @@ export function renderSchedule(selectedDate = null) {
         card.innerHTML = `
             <div class="schedule-info">
                 <h4>${schedule.time} - ${client ? `${client.name} (ID: ${client.id})` : 'Cliente não encontrado'}</h4>
-                <p><strong>Serviço:</strong> ${serviceNames[schedule.serviceType] || schedule.serviceType}</p>
+                <p><strong>Serviço:</strong> ${serviceNames[schedule.service_type] || schedule.service_type}</p>
                 <p><strong>Status:</strong> ${schedule.status.charAt(0).toUpperCase() + schedule.status.slice(1)}</p>
-                ${schedule.assignedToUserName ? `<p><strong>Atribuído a:</strong> ${schedule.assignedToUserName}</p>` : '<p><strong>Atribuído a:</strong> Não atribuído</p>'}
+                ${schedule.assigned_to_user_name ? `<p><strong>Atribuído a:</strong> ${schedule.assigned_to_user_name}</p>` : '<p><strong>Atribuído a:</strong> Não atribuído</p>'}
                 ${schedule.observations ? `<p><strong>Obs:</strong> ${schedule.observations}</p>` : ''}
                 ${cancellationInfo}
             </div>
@@ -287,7 +296,7 @@ export async function updateScheduleStatus(scheduleId, newStatus) {
         // A user can confirm if they have 'edit' access to 'agenda' tab
         // OR if they have 'view' access and the schedule is assigned to them.
         const canConfirm = checkTabAccess('agenda', 'edit') ||
-                           (checkTabAccess('agenda', 'view') && schedule.assigned_to === currentUser.id);
+                           (checkTabAccess('agenda', 'view') && schedule.assigned_to_user_uid === currentUser.id);
 
         if (newStatus === 'confirmado') {
             if (!canConfirm) {
@@ -311,7 +320,7 @@ export async function updateScheduleStatus(scheduleId, newStatus) {
             if (checkTabAccess('agenda', 'edit')) {
                 profissionalResponsavelInput.value = schedule.assigned_to_name || currentUser.name;
                 profissionalResponsavelInput.readOnly = false;
-            } else if (checkTabAccess('agenda', 'view') && schedule.assignedToUserId === currentUser.id) {
+            } else if (checkTabAccess('agenda', 'view') && schedule.assigned_to_user_uid === currentUser.id) {
                 profissionalResponsavelInput.value = currentUser.name;
                 profissionalResponsavelInput.readOnly = true;
             } else {
@@ -347,7 +356,7 @@ export function cancelScheduleWithReason(scheduleId) {
 
     // Permission check for cancelling
     // A user can cancel if they have 'edit' access to 'agenda' tab
-    const canCancel = checkTabAccess('agenda', 'edit') || (checkTabAccess('agenda', 'view') && schedule.assignedToUserId === currentUser.id);
+    const canCancel = checkTabAccess('agenda', 'edit') || (checkTabAccess('agenda', 'view') && schedule.assigned_to_user_uid === currentUser.id);
 
     if (!canCancel) {
         showNotification('Você não tem permissão para cancelar este agendamento.', 'error');
@@ -513,7 +522,7 @@ export function renderCalendar() {
 
             // Apply unit filter to calendar highlights
             if (unitFilter !== 'all') {
-                const client = db.clients.find(c => c.id === schedule.clientId);
+                const client = db.clients.find(c => c.id === schedule.client_id);
                 if (!client || client.unit !== unitFilter) {
                     return false;
                 }
@@ -523,10 +532,10 @@ export function renderCalendar() {
                 if (professionalIdFilter === 'all') {
                     return true;
                 } else {
-                    return schedule.assignedToUserId === parseInt(professionalIdFilter);
+                    return schedule.assigned_to_user_uid === professionalIdFilter;
                 }
             } else {
-                return schedule.assignedToUserId === currentUser.id;
+                return schedule.assigned_to_user_uid === currentUser.id;
             }
         });
 
@@ -559,7 +568,7 @@ export function reassignSchedule(scheduleId) {
         return;
     }
 
-    const client = db.clients.find(c => c.id === schedule.clientId);
+    const client = db.clients.find(c => c.id === schedule.client_id);
     const clientName = client ? client.name : 'Cliente Desconhecido';
 
     document.getElementById('reassign-schedule-info').textContent = `Agendamento de ${clientName} (${schedule.time})`;
@@ -577,8 +586,8 @@ export function reassignSchedule(scheduleId) {
     });
 
     // Pre-select if already assigned
-    if (schedule.assignedToUserId) {
-        selectAssignedUser.value = schedule.assignedToUserId;
+    if (schedule.assigned_to_user_uid) {
+        selectAssignedUser.value = schedule.assigned_to_user_uid;
     } else {
         selectAssignedUser.value = ''; // Ensure nothing is pre-selected if not assigned
     }
@@ -593,7 +602,7 @@ export async function saveReassignedSchedule() {
         return;
     }
 
-    const client = db.clients.find(c => c.id === schedule.clientId);
+    const client = db.clients.find(c => c.id === schedule.client_id);
     if (!client) {
         showNotification('Erro: Cliente do agendamento não encontrado.', 'error');
         return;
@@ -607,11 +616,11 @@ export async function saveReassignedSchedule() {
         return;
     }
 
-    const oldAssignedUserName = schedule.assignedToUserName;
+    const oldAssignedUserName = schedule.assigned_to_user_name;
     const newAssignedUserName = newAssignedUser.name;
 
     // NEW LOGIC: If re-assigning to a different user, create a notification
-    if (schedule.assignedToUserId !== newAssignedUserId) {
+    if (schedule.assigned_to_user_uid !== newAssignedUserId) {
         try {
             await pushNotification({
                 user_id: newAssignedUserId,
@@ -654,8 +663,8 @@ export async function saveReassignedSchedule() {
         }
     }
 
-    schedule.assignedToUserId = newAssignedUserId;
-    schedule.assignedToUserName = newAssignedUser.name;
+    schedule.assigned_to_user_uid  = newAssignedUserId;
+    schedule.assigned_to_user_name = newAssignedUser.name;
 
     // (removido) saveDb()
     document.getElementById('modal-reassign-schedule').style.display = 'none';
@@ -708,7 +717,7 @@ export function populateAssignableUsers() {
 
 // NEW: Add schedule function (corrigida para schema)
 export async function addSchedule(scheduleData) {
-    if (!checkTabAccess('agenda', 'add')) {
+    if (!checkTabAccess('agenda', 'create')) {  // tab_access usa "create"
         showNotification('Você não tem permissão para criar agendamentos.', 'error');
         return;
     }
@@ -716,14 +725,14 @@ export async function addSchedule(scheduleData) {
         const { id: uid } = await getUser();
 
         const payload = {
-            client_id: scheduleData.clientId ?? scheduleData.client_id,
+            client_id: scheduleData.client_id ?? scheduleData.clientId,
             date: scheduleData.date,                 // 'YYYY-MM-DD'
             time: scheduleData.time,                 // 'HH:MM'
             service_type: scheduleData.serviceType ?? scheduleData.service_type,
             observations: scheduleData.observations ?? null,
             status: scheduleData.status ?? 'agendado',
-            assigned_to_user_uid: scheduleData.assignedToUserId ?? scheduleData.assigned_to_user_uid ?? null,
-            assigned_to_user_name: scheduleData.assignedToUserName ?? scheduleData.assigned_to_user_name ?? null,
+            assigned_to_user_uid:  scheduleData.assigned_to_user_uid  ?? scheduleData.assignedToUserId  ?? null,
+            assigned_to_user_name: scheduleData.assigned_to_user_name ?? scheduleData.assignedToUserName ?? null,
             user_id: uid
         };
 
@@ -747,7 +756,7 @@ export async function editSchedule(scheduleId, patchData) {
     }
     try {
         const updateData = {
-            client_id: patchData.clientId ?? patchData.client_id,
+            client_id: patchData.client_id ?? patchData.clientId,
             date: patchData.date ?? null,
             time: patchData.time ?? null,
             service_type: patchData.serviceType ?? patchData.service_type,
@@ -805,7 +814,7 @@ export async function confirmAttendance(attendanceData) {
 
         // 1) cria appointment com campos do schema
         const appointmentPayload = {
-            client_id: attendanceData.clientId ?? attendanceData.client_id,
+            client_id: attendanceData.client_id ?? attendanceData.clientId,
             date: attendanceData.date,                 // use a mesma data do schedule
             time: attendanceData.time,                 // idem
             service_type: attendanceData.serviceType ?? attendanceData.service_type,

@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## [2025-08-12 10:30] — Agenda & RLS (admin vê todos)
+- SQL: aplicada `admin_can_select_all_schedules` e reforço de `tab_access` p/ admins.
+- JS: `schedule.js` normalizado para snake_case; admin não filtra por usuário; calendário e lista do dia alinhados.
+
+## [2025-08-12 10:15] — Agenda & Null-Safety
+- SQL: política `admin_can_select_all_schedules` aplicada; `tab_access` de admins reforçado.
+- JS: `renderClientReport` e `initializeApp` com guards contra DOM ausente.
+- JS: `renderSchedule()` não filtra por usuário quando `role==='admin'`.
+
 ## [2025-08-12 10:00] — Correção RLS Admin Schedules + tab_access
 - sql/fix_admin_schedules_permissions.sql: política RLS para admin ver todos os agendamentos
 - UPDATE tab_access dos admins para incluir permissões completas de agenda/schedule/schedules  
