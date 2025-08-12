@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## [2025-08-12 09:30] — Hotfix Relatório de Clientes (null safety)
+- clients.js: renderClientReport() só roda se existir #client-report-container; troca todas atribuições diretas por _txt() helper
+- main.js: protegida leitura do seletor de período com optional chaining; renderClientReport() chamada de forma idempotente
+- Elimina crashes "Cannot set properties of null (setting 'textContent')" ao navegar entre abas
+
 ## [2025-08-12 09:15] — Hotfix de Login (clients.js)
 - Corrigido helper `_txt` para não usar optional chaining em atribuição (`?.textContent = ...`), que quebrava o parse do JS e impedia o login.
 - Alteração mínima, sem impacto em UX/lógica. Requer hard reload.

@@ -281,7 +281,8 @@ async function initializeApp() {
     safeInit('stock-list', () => { if (onPage('stock-list')) renderStockList(); });
     safeInit('stock-movements', () => { if (onPage('stock-list')) renderStockMovements(); });
     safeInit('stock-summary', () => { if (onPage('stock-list')) updateStockSummary().catch(() => { /* não travar a UI */ }); });
-    safeInit('client-report', () => { if (onPage('client-list-container')) renderClientReport(); });
+    // Chamada null-safe: só renderiza relatório quando a aba/DOM existem
+    safeInit('client-report', () => { renderClientReport(); });
     safeInit('funcionario-list', () => { if (onPage('funcionario-list')) renderFuncionarioList(); });
     if (checkTabAccess('documentos', 'view')) {
         safeInit('general-documents', () => {
@@ -469,7 +470,9 @@ function setupEventListeners() {
                 renderCalendar();
                 initScheduleView(); // Re-initialize when switching to the tab
             } else if (tabId === 'relatorios') {
-                renderClientReport(document.getElementById('client-report-period').value);
+                const periodSelect = document.getElementById('client-report-period');
+                const periodVal = periodSelect?.value || 'all';
+                renderClientReport(periodVal);
             } else if (tabId === 'financeiro') {
                 const selectedPeriod = document.getElementById('financial-period-selector').value;
                 renderFinancialReport(selectedPeriod);

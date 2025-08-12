@@ -588,35 +588,31 @@ export function renderMeusPacientes(filter = '') {
 }
 
 export function renderClientReport(selectedPeriod = 'all') {
-  // Guard: não renderiza se a seção não existir (evita null.textContent)
-  const root =
-    document.getElementById('client-report-container') ||
-    document.getElementById('client-list-container') ||
-    document.getElementById('relatorios-container');
-  if (!root) return;
+  // Guard: só rende se existir o container de RELATÓRIOS
+  // Evita atualizar cartões quando estamos em outras abas
+  const reportRoot = document.getElementById('client-report-container');
+  if (!reportRoot) {
+    // Nada de fallback para outras áreas aqui: os IDs dos cards só existem na aba Relatórios
+    return;
+  }
     
     // The role check for renderClientReport needs to be updated to match the tab visibility
     // If the tab is visible to ALL_ADMIN_VIEW_CLIENTS_AND_EMPLOYEES, then the report should render for them.
     if (!isUserRoleIn(ALL_ADMIN_VIEW_CLIENTS_AND_EMPLOYEES)) { // Updated role check
-        // If not allowed, clear the report dashboard and show a message
+        // Mensagem no dashboard, se existir
         const reportDashboard = document.querySelector('.client-report-dashboard');
-        if (reportDashboard) {
-            reportDashboard.innerHTML = '<p>Você não tem permissão para visualizar este relatório.</p>';
-        }
-        // Also ensure summary cards are reset or hidden if user doesn't have permission
-        document.getElementById('total-clients-count').textContent = '0';
-        document.getElementById('adult-clients-count').textContent = '0';
-        document.getElementById('minor-clients-count').textContent = '0';
+        if (reportDashboard) reportDashboard.innerHTML = '<p>Você não tem permissão para visualizar este relatório.</p>';
+        // Zera contadores de forma null-safe
+        _txt('total-clients-count', '0');
+        _txt('adult-clients-count', '0');
+        _txt('minor-clients-count', '0');
         _txt('clients-with-appointments', '0');
         _txt('clients-without-recent-appointments', '0');
         _txt('clients-with-schedules', '0');
-        const periodDisplayElement = document.getElementById('client-report-period-display');
-        if (periodDisplayElement) {
-             periodDisplayElement.textContent = 'Acesso Restrito';
-        }
-        // Hide professional statistics if not allowed
+        _txt('client-report-period-display', 'Acesso Restrito');
+        // Limpa estatísticas adicionais, se existirem
         const statsSection = document.getElementById('professional-statistics-section');
-        if (statsSection) statsSection.innerHTML = ''; // Clear contents
+        if (statsSection) statsSection.innerHTML = '';
         return;
     }
     
@@ -715,10 +711,10 @@ export function renderClientReport(selectedPeriod = 'all') {
     });
     const clientsWithSchedules = clientsWithSchedulesSet.size;
     
-    // Update summary cards
-    document.getElementById('total-clients-count').textContent = totalClients;
-    document.getElementById('adult-clients-count').textContent = adultClients;
-    document.getElementById('minor-clients-count').textContent = minorClients;
+    // Update summary cards (null-safe)
+    _txt('total-clients-count', totalClients);
+    _txt('adult-clients-count', adultClients);
+    _txt('minor-clients-count', minorClients);
     _txt('clients-with-appointments', activeClientsCount);
     _txt('clients-without-recent-appointments', inactiveClientsCount);
     _txt('clients-with-schedules', clientsWithSchedules);
@@ -735,9 +731,7 @@ export function renderClientReport(selectedPeriod = 'all') {
     };
     
     const periodDisplayElement = document.getElementById('client-report-period-display');
-    if (periodDisplayElement) {
-        periodDisplayElement.textContent = periodNames[selectedPeriod] || 'Todos os períodos';
-    }
+    _txt('client-report-period-display', periodNames[selectedPeriod] || 'Todos os períodos');
     
     // Get search filters
     const professionalFilter = document.getElementById('search-professional-report') ? document.getElementById('search-professional-report').value : '';
