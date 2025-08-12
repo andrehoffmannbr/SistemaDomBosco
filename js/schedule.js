@@ -153,6 +153,9 @@ function populateProfessionalFilter() {
 
 export function renderSchedule(selectedDate = null) {
     const agendaList = document.getElementById('agenda-list');
+    // Null-safety: se o container não existir (ex.: troca rápida de abas), não quebra a aplicação
+    if (!agendaList) return;
+    
     const dateToShow = selectedDate || new Date().toISOString().split('T')[0];
     const currentUser = getCurrentUser();
     
@@ -225,15 +228,15 @@ export function renderSchedule(selectedDate = null) {
         const client = db.clients.find(c => c.id === schedule.client_id);
         
         let cancellationInfo = '';
-        if (schedule.status === 'cancelado' && schedule.cancelReason) {
+        if (schedule.status === 'cancelado' && schedule.cancel_reason) {
             cancellationInfo = `
                 <div class="cancellation-info">
                     <h5>Motivo do Cancelamento:</h5>
-                    <div class="cancellation-reason">${schedule.cancelReason}</div>
-                    ${schedule.cancelImage ? `
-                        <img src="${schedule.cancelImage}" alt="Comprovante do cancelamento" class="cancellation-image" onclick="window.open('${schedule.cancelImage}', '_blank')">
+                    <div class="cancellation-reason">${schedule.cancel_reason}</div>
+                    ${schedule.cancel_image ? `
+                        <img src="${schedule.cancel_image}" alt="Comprovante do cancelamento" class="cancellation-image" onclick="window.open('${schedule.cancel_image}', '_blank')">
                     ` : ''}
-                    <small>Cancelado em ${new Date(schedule.cancelDate).toLocaleDateString('pt-BR')} por ${schedule.canceledBy}</small>
+                    <small>Cancelado em ${new Date(schedule.cancel_date).toLocaleDateString('pt-BR')} por ${schedule.canceled_by}</small>
                 </div>
             `;
         }
@@ -608,8 +611,8 @@ export async function saveReassignedSchedule() {
         return;
     }
 
-    const newAssignedUserId = parseInt(document.getElementById('select-assigned-user').value);
-    const newAssignedUser = db.users.find(u => u.id === newAssignedUserId);
+    const newAssignedUserId = document.getElementById('select-assigned-user').value; // UUID string
+    const newAssignedUser   = db.users.find(u => String(u.id) === String(newAssignedUserId));
 
     if (!newAssignedUser) {
         showNotification('Por favor, selecione um profissional válido.', 'warning');
@@ -620,7 +623,7 @@ export async function saveReassignedSchedule() {
     const newAssignedUserName = newAssignedUser.name;
 
     // NEW LOGIC: If re-assigning to a different user, create a notification
-    if (schedule.assigned_to_user_uid !== newAssignedUserId) {
+    if (String(schedule.assigned_to_user_uid) !== String(newAssignedUserId)) {
         try {
             await pushNotification({
                 user_id: newAssignedUserId,
@@ -859,3 +862,5 @@ window.cancelScheduleWithReason = cancelScheduleWithReason;
 // [B2] REMOVED — window.editSchedule = editSchedule; (causes duplicate declaration)
 window.reassignSchedule = reassignSchedule;
 window.saveReassignedSchedule = saveReassignedSchedule;
+// Expor para debug/QA (não altera UX nem fluxo)
+window.renderSchedule = renderSchedule;

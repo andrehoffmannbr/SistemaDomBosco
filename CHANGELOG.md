@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## [2025-08-12 11:35] — Revisão Final Agenda (admin + verificação)
+- SQL: reaplicado fix/RLS (idempotente) e criado `sql/VERIFY_admin_schedules.sql`.
+- JS: `schedule.js` com null-safety no `renderSchedule` e `window.renderSchedule` exposto p/ QA.
+- Resultado: admin lista todos os agendamentos do dia; console limpo em troca de abas.
+
+## [2025-08-12 10:45] — Hotfix Agenda (cancelamento + UUID)
+- schedule.js: cancelReason/Image/Date/canceledBy → cancel_reason/image/date/canceled_by
+- schedule.js: saveReassignedSchedule usa UUID string (sem parseInt) e compara como string
+
 ## [2025-08-12 10:30] — Agenda & RLS (admin vê todos)
 - SQL: aplicada `admin_can_select_all_schedules` e reforço de `tab_access` p/ admins.
 - JS: `schedule.js` normalizado para snake_case; admin não filtra por usuário; calendário e lista do dia alinhados.
