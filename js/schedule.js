@@ -407,6 +407,50 @@ function populateEditServiceTypeOptions() {
     });
 }
 
+// =====================================================
+// EDIT WRAPPER — Abre o modal de edição e preenche campos
+// =====================================================
+export async function editSchedule(scheduleId) {
+    try {
+        const { data: schedule, error } = await supabase
+            .from('schedules')
+            .select('*')
+            .eq('id', scheduleId)
+            .single();
+            
+        if (error) throw error;
+        if (!schedule) {
+            showNotification('Agendamento não encontrado.', 'error');
+            return;
+        }
+        
+        // Guardar ID atual em edição
+        window.currentEditingScheduleId = scheduleId;
+        
+        // Popular selects
+        populateEditClientSelectOptions();
+        populateEditServiceTypeOptions();
+        
+        // Helper null-safe
+        const setVal = (id, v) => {
+            const el = document.getElementById(id);
+            if (el) el.value = v ?? '';
+        };
+        
+        setVal('edit-cliente-agenda', String(schedule.client_id ?? ''));
+        setVal('edit-data-agendamento', schedule.date ?? '');
+        setVal('edit-hora-agendamento', schedule.time ?? '');
+        setVal('edit-tipo-servico', schedule.service_type ?? '');
+        setVal('edit-observacoes-agendamento', schedule.observations ?? '');
+        
+        // Abrir modal
+        const modal = document.getElementById('modal-editar-agendamento');
+        if (modal) modal.style.display = 'flex';
+    } catch (e) {
+        showNotification('Erro ao abrir edição: ' + (e?.message || e), 'error');
+    }
+}
+
 export async function saveEditedSchedule() {
     const { data: schedules } = await supabase.from('schedules').select('*');
     const schedule = schedules.find(s => s.id === window.currentEditingScheduleId);
@@ -751,8 +795,8 @@ export async function addSchedule(scheduleData) {
     }
 }
 
-// NEW: Edit schedule function (corrigida para schema)
-export async function editSchedule(scheduleId, patchData) {
+// Update schedule function — Renomeada para evitar conflito
+export async function updateSchedule(scheduleId, patchData) {
     if (!checkTabAccess('agenda', 'edit')) {
         showNotification('Você não tem permissão para editar agendamentos.', 'error');
         return;
@@ -859,8 +903,8 @@ export async function confirmAttendance(attendanceData) {
 
 // Make functions available globally for onclick handlers
 window.cancelScheduleWithReason = cancelScheduleWithReason;
-// [B2] REMOVED — window.editSchedule = editSchedule; (causes duplicate declaration)
 window.reassignSchedule = reassignSchedule;
 window.saveReassignedSchedule = saveReassignedSchedule;
 // Expor para debug/QA (não altera UX nem fluxo)
 window.renderSchedule = renderSchedule;
+window.editSchedule = editSchedule;

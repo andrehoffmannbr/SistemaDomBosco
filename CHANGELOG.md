@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## [2025-08-12 11:45] — Fix: Correção fluxo de edição de agendamentos
+- schedule.js: separada função editSchedule (modal) de updateSchedule (banco)
+- schedule.js: adicionada null-safety no preenchimento do modal de edição
+- schedule.js: window.editSchedule exposto para botões onclick
+- Resolve erro "Cannot read properties of undefined (reading 'client_id')"
+
 ## [2025-08-12 11:35] — Revisão Final Agenda (admin + verificação)
 - SQL: reaplicado fix/RLS (idempotente) e criado `sql/VERIFY_admin_schedules.sql`.
 - JS: `schedule.js` com null-safety no `renderSchedule` e `window.renderSchedule` exposto p/ QA.
