@@ -14,21 +14,35 @@ export async function addDailyNote(note) {
     try {
         const user = await getUser();
         if (!user) throw new Error('Usuário não autenticado');
-        
-        // data padrão (YYYY-MM-DD) quando não vier do form
-        const today = new Date();
-        const yyyy = today.getFullYear();
-        const mm = String(today.getMonth()+1).padStart(2,'0');
-        const dd = String(today.getDate()).padStart(2,'0');
-        const safeDate = note?.date || `${yyyy}-${mm}-${dd}`;
 
-        const payload = { 
-            ...note, 
-            date: safeDate,
-            user_id: user.id,
-            created_at: new Date().toISOString()
+        // Normalização compatível com a UI atual (sem alterar layout/fluxo)
+        const safeTrim = v => (typeof v === 'string' ? v.trim() : v);
+        const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+
+        const title =
+            safeTrim(note?.title) ||
+            safeTrim(note?.description) ||
+            'Sem título';
+
+        const content =
+            safeTrim(note?.content) ||
+            safeTrim(note?.description) ||
+            '—';
+
+        const payload = {
+            date: note?.date || today,
+            type: note?.type,                              // 'receita' | 'despesa'
+            value: note?.value !== undefined && note?.value !== null && note?.value !== ''
+                ? Number(note.value)
+                : null,
+            title,                                         // NOT NULL (garantido)
+            content,                                       // NOT NULL (garantido)
+            category: note?.category ?? null,
+            file_name: note?.file_name ?? note?.fileName ?? null,
+            file_data: note?.file_data ?? note?.fileData ?? null,
+            user_id: user.id
         };
-        
+
         const { error } = await supabase.from('daily_notes').insert(payload);
         if (error) throw error;
         await hydrate('dailyNotes');

@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [2025-08-12 11:50] — Fix: Correção título nulo em daily_notes
+- financial.js: addDailyNote() com normalização de title/content
+- Infere title de description quando vazio, default "Sem título"
+- Infere content de description quando vazio, default "—"
+- Mapeia fileName/fileData → file_name/file_data para compatibilidade
+- Resolve erro "null value in column 'title'"
+
 ## [2025-08-12 11:45] — Fix: Correção fluxo de edição de agendamentos
 - schedule.js: separada função editSchedule (modal) de updateSchedule (banco)
 - schedule.js: adicionada null-safety no preenchimento do modal de edição
