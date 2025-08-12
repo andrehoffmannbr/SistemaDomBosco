@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## [2025-08-12 10:00] — Correção RLS Admin Schedules + tab_access
+- sql/fix_admin_schedules_permissions.sql: política RLS para admin ver todos os agendamentos
+- UPDATE tab_access dos admins para incluir permissões completas de agenda/schedule/schedules  
+- Resolve problema onde admin não conseguia visualizar agendamentos de outros usuários
+
 ## [2025-08-12 09:30] — Hotfix Relatório de Clientes (null safety)
 - clients.js: renderClientReport() só roda se existir #client-report-container; troca todas atribuições diretas por _txt() helper
 - main.js: protegida leitura do seletor de período com optional chaining; renderClientReport() chamada de forma idempotente
