@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## [2025-08-13 17:15] — Fix cadastro funcionário (binds & export)
+- funcionarios.js: export global idempotente de `addNewFuncionario` + fallback chain em delegations
+- main.js: chamada idempotente de `ensureSaveFuncionarioBinds()` ao abrir a aba de funcionários
+- index.html: fallback inline `onclick` no botão (não interfere com binds existentes)
+
 ## [2025-08-13 17:00] — Hotfix Funcionários (bind + export)
 - Corrigida a ordem do bind em `btn-save-funcionario` para (id, handler, event)
 - Exportada `addNewFuncionario` em `globalThis` para suportar delegação

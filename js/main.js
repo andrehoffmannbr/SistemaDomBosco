@@ -558,6 +558,10 @@ function setupEventListeners() {
     }, false);
     // ─────────────────────────────────────────────────────────────
 
+    // [FUNC-BINDS] Reforça binds quando o código de funcionários já tiver sido carregado
+    // (idempotente; se não existir, não quebra)
+    try { globalThis.ensureSaveFuncionarioBinds?.(); } catch (_) {}
+
     // Tab navigation
     Array.from(document.querySelectorAll('.tab-button')).forEach(button => {
         button.addEventListener('click', () => {
@@ -581,6 +585,9 @@ function setupEventListeners() {
                 renderSchedule();
                 renderCalendar();
                 initScheduleView(); // Re-initialize when switching to the tab
+            } else if (tabId === 'funcionarios') {
+                // [FUNC-BINDS] Ao entrar na aba de funcionários, garanta que os binds existam
+                try { globalThis.ensureSaveFuncionarioBinds?.(); } catch (_) {}
             } else if (tabId === 'relatorios') {
                 const periodSelect = document.getElementById('client-report-period');
                 const periodVal = periodSelect?.value || 'all';

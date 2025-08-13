@@ -62,6 +62,17 @@ function ensureSaveFuncionarioBinds() {
   }
 }
 
+// [EXPORT] Torna addNewFuncionario global (idempotente)
+// Motivo: a delegação em main.js procura por addNewFuncionario globalmente
+// e chama na ordem: globalThis.addNewFuncionario || window.addNewFuncionario || addNewFuncionarioProxy.
+// Se não estiver global, o clique pode não acionar nada perceptível ao usuário.
+try {
+  if (typeof addNewFuncionario === 'function') {
+    if (!globalThis.addNewFuncionario) globalThis.addNewFuncionario = addNewFuncionario;
+    if (typeof window !== 'undefined' && !window.addNewFuncionario) window.addNewFuncionario = addNewFuncionario;
+  }
+} catch (_) { /* no-op: segurança */ }
+
 // Employee management module
 
 // ---- Delegation setup (runs immediately)
@@ -71,14 +82,25 @@ debugLog('Setting up funcionarios delegation listeners');
 delegateClick('#btn-save-funcionario, [data-action="save-funcionario"]', (ev, btn) => {
   ev.preventDefault();
   debugLog('Delegation: save funcionario clicked via', btn.id || btn.getAttribute('data-action'));
-  addNewFuncionario();
+  try {
+    // prioridade a handler global, cai para o local se necessário
+    (globalThis.addNewFuncionario || window.addNewFuncionario || addNewFuncionario)?.(ev);
+  } catch (e) {
+    console.error('[func] addNewFuncionario (delegation) error:', e);
+    try { showNotification('Não foi possível salvar o funcionário no momento.', 'error'); } catch {}
+  }
 });
 
 // Delegation for employee form submission
 delegateSubmit('form[data-form="funcionario"]', (ev, form) => {
   ev.preventDefault();
   debugLog('Delegation: employee form submitted');
-  addNewFuncionario();
+  try {
+    (globalThis.addNewFuncionario || window.addNewFuncionario || addNewFuncionario)?.(ev);
+  } catch (e) {
+    console.error('[func] addNewFuncionario (submit) error:', e);
+    try { showNotification('Não foi possível salvar o funcionário no momento.', 'error'); } catch {}
+  }
 });
 
 debugLog('Funcionarios delegation setup complete');

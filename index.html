@@ -1889,7 +1889,7 @@
                       class="btn btn-success"
                       type="button"
                       data-action="save-funcionario"
-                      onclick="(globalThis.addNewFuncionario||globalThis.addNewFuncionarioProxy)?.(event)">
+                      onclick="try{ (window.addNewFuncionario||globalThis.addNewFuncionario||globalThis.addNewFuncionarioProxy)?.(event); }catch(e){ console.error('[inline] addNewFuncionario fail', e); }">
                       Cadastrar Funcionário
                     </button>
                     
