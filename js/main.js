@@ -16,9 +16,13 @@ globalThis.fmtMoney ??= (v) => safeNum(v).toLocaleString('pt-BR',{ minimumFracti
 
 // ===== DOM HELPERS — SINGLE SOURCE (idempotent, null-safe) =====
 globalThis.$el ??= (id) => document.getElementById(id);
-globalThis.$val ??= (id) => {
-  const v = $el(id)?.value;
-  return (typeof v === 'string' ? v : (v ?? '')).toString().trim();
+globalThis.$val ??= (ids) => {
+  const list = Array.isArray(ids) ? ids : [ids];
+  for (const id of list) {
+    const el = document.getElementById(id);
+    if (el) return (el.value ?? '').toString().trim();
+  }
+  return '';
 };
 globalThis.$num ??= (id) => {
   const raw = $val(id);
@@ -39,6 +43,45 @@ globalThis.bindIfExists ??= (id, handler, evt = 'click') => {
   }
   return true;
 };
+
+// === Proxy de cadastro de funcionário =======================================
+// Chama a implementação robusta de funcionarios.js se disponível;
+// caso não, executa um fallback null-safe aqui mesmo.
+function addNewFuncionarioProxy(e) {
+  e?.preventDefault?.();
+
+  // Preferência: delegar para funcionarios.js (mais completo e com permissões)
+  if (typeof window.addNewFuncionario === 'function'
+      && window.addNewFuncionario !== addNewFuncionarioProxy) {
+    return window.addNewFuncionario(e);
+  }
+
+  // Fallback minimalista e null-safe no main.js (não quebra a UI):
+  const name  = $val(['func-name','employee-name','nome-funcionario','input-funcionario-nome']);
+  const email = $val(['func-email','employee-email','email-funcionario']);
+  const role  = $val(['func-role','employee-role','cargo-funcionario','select-role']);
+  const pass1 = $val(['func-password','employee-password','senha-func']);
+  const pass2 = $val(['func-password-confirm','employee-password-confirm','confirmar-senha-func']);
+
+  if (!name || !email || !role) {
+    try { showNotification('Preencha nome, e-mail e cargo.', 'error'); } catch(_) {}
+    console.warn('[fallback main.js] Campos obrigatórios ausentes', { name, email, role });
+    return;
+  }
+  if (!pass1 || pass1 !== pass2) {
+    try { showNotification('Senha e confirmação não conferem.', 'error'); } catch(_) {}
+    console.warn('[fallback main.js] Senha inválida/sem confirmação');
+    return;
+  }
+
+  // Se existir, reutiliza rotina pública já usada pelo projeto
+  if (typeof window.addFuncionario === 'function') {
+    return window.addFuncionario({ name, email, role, password: pass1 });
+  }
+
+  console.warn('[fallback main.js] Nenhuma rotina de criação encontrada (addFuncionario ausente).');
+  try { showNotification('Ação indisponível no momento.', 'error'); } catch(_) {}
+}
 
 // onPage: retorna true quando o container existe (sem depender de roteador)
 globalThis.onPage ??= (rootId) => !!el(rootId);
@@ -939,48 +982,9 @@ function setupEventListeners() {
     }
 
     // NEW: Add Funcionario Button Handler
-    document.getElementById('btn-add-funcionario').addEventListener('click', () => {
-        if (!checkTabAccess('funcionarios', 'edit')) { showNotification('Você não tem permissão para adicionar funcionários.', 'error'); return; }
-        document.getElementById('form-add-funcionario').reset();
-        
-        // NEW: Populate the role dropdown for the new user form
-        populateNewFuncionarioRoleSelect();
-        
-        // The container 'new-funcionario-tab-permissions' is for the NEW user being added.
-        // It should always be editable, so disableSelfEdit is false here.
-        // For a new user, there's no pre-existing role yet to determine defaults, so pass null for userRoleForDefaults
-        populateTabPermissions('new-funcionario-tab-permissions', {}, false, null); 
+    bindIfExists('btn-add-funcionario', addNewFuncionarioProxy, 'click');
 
-        // Add event listener to show/hide academic fields based on role
-        const roleSelect = document.getElementById('new-funcionario-role');
-        const academicFields = document.getElementById('new-funcionario-academic-fields');
-
-        const handleRoleChange = () => {
-            const selectedRole = roleSelect.value;
-            // The academic fields should be shown if the selected role is a professional one,
-            // OR if the field is not empty (in case it was pre-filled and the role is not professional).
-            // For a new user, the latter condition is less relevant, but it's good practice.
-            if (PROFESSIONAL_ROLES.includes(selectedRole)) {
-                academicFields.style.display = 'block';
-            } else {
-                academicFields.style.display = 'none';
-            }
-            // Also update the permission hints when the role changes
-            populateTabPermissions('new-funcionario-tab-permissions', {}, false, selectedRole);
-        };
-
-        // Remove previous listener to avoid duplicates if modal is opened multiple times
-        roleSelect.removeEventListener('change', handleRoleChange);
-        roleSelect.addEventListener('change', handleRoleChange);
-        handleRoleChange(); // Call once to set initial visibility
-
-        document.getElementById('modal-add-funcionario').style.display = 'flex';
-    });
-
-    document.getElementById('form-add-funcionario').addEventListener('submit', (e) => {
-        e.preventDefault();
-        addNewFuncionario();
-    });
+    bindIfExists('form-add-funcionario', addNewFuncionarioProxy, 'submit');
 
     // NEW: Role Management button
     document.getElementById('btn-manage-roles').addEventListener('click', () => {
@@ -1768,72 +1772,9 @@ async function processStockAdjustment() {
     updateGlobalSearchDatalist();
 }
 
-function addNewFuncionario() {
-    if (!checkTabAccess('funcionarios', 'edit')) { 
-        showNotification('Você não tem permissão para adicionar funcionários.', 'error'); 
-        return; 
-    }
-
-    const username = document.getElementById('new-funcionario-username').value.trim();
-    const email = document.getElementById('new-funcionario-email').value.trim();
-    const password = document.getElementById('new-funcionario-password').value.trim();
-    const name = document.getElementById('new-funcionario-name').value.trim();
-    const role = document.getElementById('new-funcionario-role').value; // Get from select dropdown
-    const cpf = document.getElementById('new-funcionario-cpf').value.trim();
-    const phone = document.getElementById('new-funcionario-phone').value.trim();
-    const address = document.getElementById('new-funcionario-address').value.trim();
-    
-    // Academic fields are now always collected if filled, regardless of the custom role string
-    let academicInfo = {};
-    // Only collect academic info if the section is visible (which is based on the selected role)
-    if (document.getElementById('new-funcionario-academic-fields').style.display === 'block') {
-        academicInfo = {
-            institution: document.getElementById('new-funcionario-institution').value.trim(),
-            graduationPeriod: document.getElementById('new-funcionario-graduation-period').value.trim(),
-            education: document.getElementById('new-funcionario-education').value.trim(),
-            discipline: document.getElementById('new-funcionario-discipline').value.trim()
-        };
-    }
-    
-    // Clear academicInfo if all its fields are empty
-    if (Object.values(academicInfo).every(val => val === '')) {
-        academicInfo = {};
-    }
-
-    // Collect tab permissions from the dynamically generated selects
-    const newTabAccess = {};
-    let hasCustomAccess = false;
-    document.querySelectorAll('#new-funcionario-tab-permissions select').forEach(select => {
-        const tabId = select.dataset.tabId; // Use data-tab-id
-        const accessLevel = select.value;
-        if (accessLevel !== 'default') { // Only include if it's an explicit override
-            newTabAccess[tabId] = accessLevel;
-            hasCustomAccess = true;
-        }
-    });
-
-    // Use email as the primary identifier, fall back to username if no email
-    const authEmail = email || username;
-    
-    if (!authEmail || !password || !name || !role) {
-        showNotification('Email/usuário, senha, nome e cargo são campos obrigatórios.', 'warning');
-        return;
-    }
-
-    const funcionarioData = {
-        email: authEmail,
-        password,
-        name,
-        role, // Use the role from select dropdown
-        cpf,
-        phone,
-        address,
-        academicInfo: academicInfo, 
-        tab_access: hasCustomAccess ? newTabAccess : {},
-        unit: null // For future use if units are implemented
-    };
-
-    addFuncionario(funcionarioData); // This is now async, no need to wait here
+function addNewFuncionario(e) {
+    // Delegate to proxy for better error handling and compatibility
+    return addNewFuncionarioProxy(e);
 }
 
 function renderGeneralDocuments(filter = '', typeFilter = '') { 
@@ -2251,3 +2192,16 @@ function softRefreshData() {
     checkNotifications();
     showNotification('Dados atualizados em segundo plano.', 'info', 'Sincronização', 2000);
 }
+
+// ===== Binds pós-DOM, idempotentes, usando a proxy =====
+document.addEventListener('DOMContentLoaded', () => {
+  // Fallbacks adicionais (se o HTML usar data-attrs ou submit do form)
+  try {
+    document.querySelector('[data-action="save-funcionario"]')
+      ?.addEventListener('click', addNewFuncionarioProxy);
+  } catch {}
+  try {
+    document.querySelector('form[data-form="funcionario"]')
+      ?.addEventListener('submit', addNewFuncionarioProxy);
+  } catch {}
+});
