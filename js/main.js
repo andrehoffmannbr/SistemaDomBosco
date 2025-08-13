@@ -33,15 +33,28 @@ globalThis.$num ??= (id) => {
   return Number.isFinite(n) ? n : null;
 };
 
-globalThis.bindIfExists ??= (id, handler, evt = 'click') => {
-  const node = $el(id);
-  if (!node) return false;
-  const key = `__bound_${evt}`;
-  if (!node[key]) {
-    node.addEventListener(evt, handler, { passive: false });
-    node[key] = true;
+// Wrapper para handlers de submit: sempre previne o envio nativo
+function withSubmit(handler) {
+  return (ev) => {
+    try { ev?.preventDefault?.(); } catch (_) {}
+    return handler?.(ev);
+  };
+}
+
+// bindIfExists padronizado: (id, handler, event = 'click')
+globalThis.bindIfExists = function bindIfExists(id, handler, event = 'click') {
+  try {
+    const el = document.getElementById(id);
+    if (!el) return false;
+    if (typeof handler !== 'function') return false;
+    const flag = `__bound_${event}`;
+    if (el[flag]) return true; // idempotente
+    el.addEventListener(event, (ev) => handler(ev), false);
+    el[flag] = true;
+    return true;
+  } catch (_) {
+    return false;
   }
-  return true;
 };
 
 // === Proxy de cadastro de funcionário =======================================
@@ -91,16 +104,6 @@ function safeInit(label, fn) {
   try { fn?.(); } catch (e) {
     console.error('init error:', label, e);
   }
-}
-
-// Novo: binder seguro para listeners com fallback silencioso
-function bindIfExists(id, event, handler) {
-  const node = document.getElementById(id);
-  if (node && typeof node.addEventListener === 'function') {
-    node.addEventListener(event, handler);
-    return true;
-  }
-  return false;
 }
 
 // Reidrata currentUser no localStorage a partir de profiles (quando já existe sessão)
@@ -454,8 +457,7 @@ function setupEventListeners() {
     document.addEventListener('scroll', resetIdleTimer);
     // --- End Inactivity Logout Event Listeners ---
 
-    bindIfExists('form-login','submit', async (e) => {
-        e.preventDefault();
+    bindIfExists('form-login', withSubmit(async (e) => {
         const username = document.getElementById('username').value;
         const password = document.getElementById('password').value;
         
@@ -474,10 +476,10 @@ function setupEventListeners() {
             console.error('Erro no login:', error);
             showNotification('Erro ao tentar fazer login. Tente novamente.', 'error');
         }
-    });
+    }), 'submit');
 
     // NEW: Notification Bell click handler
-    bindIfExists('notification-bell','click', () => {
+    bindIfExists('notification-bell', () => {
         const dropdown = document.getElementById('notification-dropdown');
         dropdown.classList.toggle('active');
 
@@ -492,7 +494,7 @@ function setupEventListeners() {
                 }
             }, 200);
         }
-    });
+    }, 'click');
 
     // Close dropdown if clicked outside (null-safe)
     document.addEventListener('click', (event) => {
@@ -509,11 +511,11 @@ function setupEventListeners() {
         }
     });
 
-    bindIfExists('btn-logout','click', () => {
+    bindIfExists('btn-logout', () => {
         clearTimeout(idleTimeout); // Clear the idle timer on manual logout
         logout();
         showLoginScreen();
-    });
+    }, 'click');
 
     // Tab navigation
     Array.from(document.querySelectorAll('.tab-button')).forEach(button => {
@@ -981,10 +983,22 @@ function setupEventListeners() {
         });
     }
 
-    // NEW: Add Funcionario Button Handler
-    bindIfExists('btn-add-funcionario', addNewFuncionarioProxy, 'click');
+    // O botão "Adicionar Novo Funcionário" deve apenas abrir o modal
+    // (nenhum bind para cadastro aqui)
 
-    bindIfExists('form-add-funcionario', addNewFuncionarioProxy, 'submit');
+    // Bind correto: botão SALVAR (no modal) e SUBMIT do formulário.
+    // Use ambos para maior compatibilidade.
+    bindIfExists('btn-save-funcionario', addNewFuncionarioProxy, 'click');
+    bindIfExists('form-add-funcionario', withSubmit(addNewFuncionarioProxy), 'submit');
+
+    // Fallback por data-attribute, se existir no seu HTML:
+    try {
+      const fallbackBtn = document.querySelector('[data-action="save-funcionario"]');
+      if (fallbackBtn && !fallbackBtn.__bound_click) {
+        fallbackBtn.addEventListener('click', (ev) => addNewFuncionarioProxy(ev));
+        fallbackBtn.__bound_click = true;
+      }
+    } catch (_) {}
 
     // NEW: Role Management button
     document.getElementById('btn-manage-roles').addEventListener('click', () => {
@@ -2195,13 +2209,13 @@ function softRefreshData() {
 
 // ===== Binds pós-DOM, idempotentes, usando a proxy =====
 document.addEventListener('DOMContentLoaded', () => {
-  // Fallbacks adicionais (se o HTML usar data-attrs ou submit do form)
+  bindIfExists('btn-save-funcionario', addNewFuncionarioProxy, 'click');
+  bindIfExists('form-add-funcionario', withSubmit(addNewFuncionarioProxy), 'submit');
   try {
-    document.querySelector('[data-action="save-funcionario"]')
-      ?.addEventListener('click', addNewFuncionarioProxy);
-  } catch {}
-  try {
-    document.querySelector('form[data-form="funcionario"]')
-      ?.addEventListener('submit', addNewFuncionarioProxy);
-  } catch {}
+    const btn = document.querySelector('[data-action="save-funcionario"]');
+    if (btn && !btn.__bound_click) {
+      btn.addEventListener('click', (ev) => addNewFuncionarioProxy(ev));
+      btn.__bound_click = true;
+    }
+  } catch (_) {}
 });

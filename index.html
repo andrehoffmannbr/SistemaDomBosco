@@ -966,7 +966,7 @@
                     <input type="text" id="search-funcionario" placeholder="Buscar funcionário por nome...">
                 </div>
                 <div class="intern-controls" style="margin-bottom: 24px;">
-                    <button id="btn-add-funcionario" class="btn-primary">
+                    <button id="btn-add-funcionario" class="btn-primary" data-target="#modal-add-funcionario" type="button">
                         <i class="fa-solid fa-user-plus"></i> Adicionar Novo Funcionário
                     </button>
                     <button id="btn-manage-roles" class="btn-secondary">
@@ -1692,7 +1692,7 @@
         <div class="modal-content">
             <button class="modal-close-btn">&times;</button>
             <h2>Adicionar Novo Funcionário</h2>
-            <form id="form-add-funcionario">
+            <form id="form-add-funcionario" data-form="funcionario">
                 <fieldset>
                     <legend>Dados de Acesso</legend>
                     <div class="form-row">
@@ -1701,12 +1701,12 @@
                             <input type="text" id="new-funcionario-username" required>
                         </div>
                         <div class="form-group">
-                            <label for="new-funcionario-password">Senha</label>
-                            <input type="password" id="new-funcionario-password" required>
+                            <label for="func-password">Senha</label>
+                            <input type="password" id="func-password" required>
                         </div>
                         <div class="form-group">
-                            <label for="new-funcionario-role">Cargo (ou Função)</label>
-                            <select id="new-funcionario-role" required>
+                            <label for="func-role">Cargo (ou Função)</label>
+                            <select id="func-role" required>
                                 <!-- Options will be populated by JS -->
                             </select>
                             <small>Selecione um cargo. Para criar um novo, vá em "Gerenciar Cargos".</small>
@@ -1718,24 +1718,24 @@
                     <legend>Dados Pessoais</legend>
                     <div class="form-row">
                         <div class="form-group">
-                            <label for="new-funcionario-name">Nome Completo</label>
-                            <input type="text" id="new-funcionario-name" required>
+                            <label for="func-name">Nome Completo</label>
+                            <input type="text" id="func-name" required>
                         </div>
                     </div>
                     <div class="form-row">
                         <div class="form-group">
-                            <label for="new-funcionario-cpf">CPF</label>
-                            <input type="text" id="new-funcionario-cpf" placeholder="000.000.000-00">
+                            <label for="func-cpf">CPF</label>
+                            <input type="text" id="func-cpf" placeholder="000.000.000-00">
                         </div>
                         <div class="form-group">
-                            <label for="new-funcionario-phone">Celular</label>
-                            <input type="tel" id="new-funcionario-phone" placeholder="(00) 90000-0000">
+                            <label for="func-phone">Celular</label>
+                            <input type="tel" id="func-phone" placeholder="(00) 90000-0000">
                         </div>
                     </div>
                     <div class="form-row">
                         <div class="form-group">
-                            <label for="new-funcionario-email">Email</label>
-                            <input type="email" id="new-funcionario-email">
+                            <label for="func-email">Email</label>
+                            <input type="email" id="func-email">
                         </div>
                     </div>
                     <div class="form-group">
@@ -1747,8 +1747,8 @@
                 <fieldset id="new-funcionario-academic-fields">
                     <legend>Formação e Acadêmico (opcional para todos)</legend>
                     <div class="form-group">
-                        <label for="new-funcionario-instituicao">Instituição de Ensino</label>
-                        <input type="text" id="new-funcionario-instituicao">
+                        <label for="func-unit">Instituição de Ensino</label>
+                        <input type="text" id="func-unit">
                     </div>
                     <div class="form-row">
                         <div class="form-group">
@@ -1769,14 +1769,128 @@
                 <fieldset>
                     <legend>Permissões de Acesso (Abas)</legend>
                     <div class="form-group">
-                        <label>Selecione as abas que este usuário poderá visualizar e/ou editar. Se nenhuma for selecionada, o usuário não terá acesso a abas que dependam de permissão. O acesso padrão do cargo não será aplicado se o cargo for personalizado.</label>
-                        <div id="new-funcionario-tab-permissions" class="checkbox-group-container">
-                            <!-- Checkboxes will be populated here -->
-                        </div>
+                        <label>Selecione o nível de acesso para cada aba. Se nenhuma for selecionada, o usuário não terá acesso a abas que dependam de permissão.</label>
+                        <section id="permissoes-funcionario" class="grid-permissoes">
+                            <label>
+                                Cadastro
+                                <select data-tabkey="cadastro">
+                                    <option value="none">Sem acesso</option>
+                                    <option value="view">Ver</option>
+                                    <option value="edit">Editar</option>
+                                </select>
+                            </label>
+
+                            <label>
+                                Agenda
+                                <select data-tabkey="agenda">
+                                    <option value="none">Sem acesso</option>
+                                    <option value="view">Ver</option>
+                                    <option value="edit">Editar</option>
+                                </select>
+                            </label>
+
+                            <label>
+                                Schedule
+                                <select data-tabkey="schedule">
+                                    <option value="none">Sem acesso</option>
+                                    <option value="view">Ver</option>
+                                    <option value="edit">Editar</option>
+                                </select>
+                            </label>
+
+                            <label>
+                                Schedules
+                                <select data-tabkey="schedules">
+                                    <option value="none">Sem acesso</option>
+                                    <option value="view">Ver</option>
+                                    <option value="edit">Editar</option>
+                                </select>
+                            </label>
+
+                            <label>
+                                Clientes
+                                <select data-tabkey="clients">
+                                    <option value="none">Sem acesso</option>
+                                    <option value="view">Ver</option>
+                                    <option value="edit">Editar</option>
+                                </select>
+                            </label>
+
+                            <label>
+                                Financeiro
+                                <select data-tabkey="finance">
+                                    <option value="none">Sem acesso</option>
+                                    <option value="view">Ver</option>
+                                    <option value="edit">Editar</option>
+                                </select>
+                            </label>
+
+                            <label>
+                                Estoque
+                                <select data-tabkey="stock">
+                                    <option value="none">Sem acesso</option>
+                                    <option value="view">Ver</option>
+                                    <option value="edit">Editar</option>
+                                </select>
+                            </label>
+
+                            <label>
+                                Usuários
+                                <select data-tabkey="users">
+                                    <option value="none">Sem acesso</option>
+                                    <option value="view">Ver</option>
+                                    <option value="edit">Editar</option>
+                                </select>
+                            </label>
+
+                            <label>
+                                Funcionários
+                                <select data-tabkey="funcionarios">
+                                    <option value="none">Sem acesso</option>
+                                    <option value="view">Ver</option>
+                                    <option value="edit">Editar</option>
+                                </select>
+                            </label>
+
+                            <label>
+                                Documentos
+                                <select data-tabkey="documents">
+                                    <option value="none">Sem acesso</option>
+                                    <option value="view">Ver</option>
+                                    <option value="edit">Editar</option>
+                                </select>
+                            </label>
+
+                            <label>
+                                Notificações
+                                <select data-tabkey="notifications">
+                                    <option value="none">Sem acesso</option>
+                                    <option value="view">Ver</option>
+                                    <option value="edit">Editar</option>
+                                </select>
+                            </label>
+
+                            <label>
+                                Relatórios
+                                <select data-tabkey="reports">
+                                    <option value="none">Sem acesso</option>
+                                    <option value="view">Ver</option>
+                                    <option value="edit">Editar</option>
+                                </select>
+                            </label>
+                        </section>
                     </div>
                 </fieldset>
 
-                <button type="submit" class="btn-primary">Cadastrar Funcionário</button>
+                <div class="form-actions">
+                    <!-- Botão de SALVAR (tem bind direto) -->
+                    <button id="btn-save-funcionario" type="button" class="btn-primary" data-action="save-funcionario">
+                        Cadastrar Funcionário
+                    </button>
+                    
+                    <!-- Hidden submit para Enter funcionar, com withSubmit() -->
+                    <button type="submit" hidden aria-hidden="true"></button>
+                </div>
             </form>
         </div>
     </div>

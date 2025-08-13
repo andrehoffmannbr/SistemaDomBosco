@@ -1,5 +1,39 @@
 # CHANGELOG
 
+## [2025-08-13 16:30] — Verificação Final de Binds/Modal Funcionários
+- index.html: form[data-form="funcionario"], #btn-save-funcionario, campos #func-* e selects com data-tabkey (incl. 'cadastro') verificados.
+- js/main.js: binds padronizados (id, handler, event) confirmados.
+- js/funcionarios.js: shim local + DOMContentLoaded binds confirmados.
+Resultado: fluxo de cadastro robusto, sem null/undefined nem reload indesejado.
+
+## [2025-08-13 16:15] — Fechamento Funcionários: Sistema Completo e Funcional
+- js/funcionarios.js: ajustado bind para usar 'form[data-form="funcionario"]' em vez de '#form-add-funcionario'
+- Verificado: todos os binds usam assinatura padronizada bindIfExists(id, handler, event)
+- Verificado: btn-save-funcionario e form[data-form="funcionario"] corretamente ligados ao salvamento
+- Verificado: btn-add-funcionario apenas abre modal (sem bind de salvar)
+- Verificado: proxy em main.js delega corretamente para funcionarios.js
+- Sistema totalmente funcional e pronto para produção
+
+## [2025-08-13 16:00] — HTML: Adicionado data-tabkey="cadastro" (finalização)
+- Adicionado select[data-tabkey="cadastro"] nas permissões de funcionários
+- Completado checklist: form[data-form="funcionario"], #func-name, #func-email, #btn-save-funcionario, select[data-tabkey] todos presentes
+- HTML totalmente compatível com os binds corretos implementados
+
+## [2025-08-13 15:45] — HTML: Correções para funcionamento dos binds
+- Ajustados IDs dos campos: func-name, func-email, func-password, func-role, func-cpf, func-phone, func-unit
+- Adicionado data-form="funcionario" no formulário
+- Criado botão específico btn-save-funcionario (type="button") + fallback data-action="save-funcionario"  
+- Mantido submit oculto para compatibilidade com withSubmit()
+- Ordem de scripts já correta: funcionarios.js antes de main.js
+
+## [2025-08-13 15:30] — Funcionários: binds corretos + padronização
+- Padronizado bindIfExists(id, handler, event='click')
+- Removido bind indevido no botão "Adicionar Novo Funcionário"
+- Binds ligados ao botão SALVAR e ao submit do form
+- Mantida compatibilidade com data-action="save-funcionario"
+- Adicionado wrapper withSubmit() para prevenir envio nativo de forms
+- js/funcionarios.js: atualizada ordem de parâmetros no shim local
+
 ## [2025-08-13 13:40] — Hotfix funcionarios.js (shim + DOMContentLoaded)
 - Adicionado shim local para bindIfExists (evita ReferenceError quando main.js ainda não carregou)
 - Binds movidos para DOMContentLoaded para garantir DOM pronto

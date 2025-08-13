@@ -1,18 +1,19 @@
 // --- SHIM local para evitar ReferenceError quando main.js ainda não carregou ---
 // Usa helper global se existir; caso contrário, define um binder idempotente local.
 // Mantém compatibilidade com o comportamento esperado do projeto.
-const bindIfExists = globalThis.bindIfExists || function (id, event, handler) {
+const bindIfExistsLocal = (id, handler, event = 'click') => {
   try {
     const el = document.getElementById(id);
-    if (!el) return;
+    if (!el || typeof handler !== 'function') return false;
     const flag = `__bound_${event}`;
-    if (el[flag]) return;            // evita bind duplo
+    if (el[flag]) return true;
+    el.addEventListener(event, (ev) => handler(ev), false);
     el[flag] = true;
-    el.addEventListener(event, handler);
-  } catch (_) {
-    // Silencioso por segurança; não deve quebrar outras telas (ex.: login)
-  }
+    return true;
+  } catch (_) { return false; }
 };
+// Usa o global se existir, senão o local
+const $bind = (globalThis.bindIfExists || bindIfExistsLocal);
 
 // Employee management module
 import { supabase } from '../lib/supabaseClient.js';
@@ -1229,22 +1230,20 @@ export async function addNewFuncionario(ev) {
 
 // ===== Binds após DOM carregado (idempotentes) =====
 document.addEventListener('DOMContentLoaded', () => {
-  bindIfExists('btn-add-funcionario', 'click', addNewFuncionario);
+  // salvar funcionário — botão
+  $bind('btn-save-funcionario', (e)=>window.addNewFuncionario?.(e), 'click');
+  
+  // salvar funcionário — submit do form (teclado/enter)
+  const form = document.querySelector('form[data-form="funcionario"]');
+  if (form && !form.__bound_submit) {
+    form.addEventListener('submit', (ev) => { ev.preventDefault(); window.addNewFuncionario?.(ev); });
+    form.__bound_submit = true;
+  }
   try {
     const btn = document.querySelector('[data-action="save-funcionario"]');
     if (btn && !btn.__bound_click) {
-      btn.addEventListener('click', addNewFuncionario);
+      btn.addEventListener('click', (ev) => addNewFuncionario(ev));
       btn.__bound_click = true;
     }
-  } catch {}
-  try {
-    const form = document.querySelector('form[data-form="funcionario"]');
-    if (form && !form.__bound_submit) {
-      form.addEventListener('submit', (e) => {
-        e.preventDefault();
-        addNewFuncionario(e);
-      });
-      form.__bound_submit = true;
-    }
-  } catch {}
+  } catch (_) {}
 });
