@@ -1884,8 +1884,13 @@
 
                 <div class="form-actions">
                     <!-- Botão de SALVAR (tem bind direto) -->
-                    <button id="btn-save-funcionario" type="button" class="btn-primary" data-action="save-funcionario">
-                        Cadastrar Funcionário
+                    <button
+                      id="btn-save-funcionario"
+                      class="btn btn-success"
+                      type="button"
+                      data-action="save-funcionario"
+                      onclick="(globalThis.addNewFuncionario||globalThis.addNewFuncionarioProxy)?.(event)">
+                      Cadastrar Funcionário
                     </button>
                     
                     <!-- Hidden submit para Enter funcionar, com withSubmit() -->

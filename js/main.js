@@ -537,7 +537,9 @@ function setupEventListeners() {
       if (!btn) return;
       e.preventDefault();
       try {
-        (window.addNewFuncionario || globalThis.addNewFuncionarioProxy)?.(e);
+        // prioridade: implementação completa -> fallback proxy
+        const fn = globalThis.addNewFuncionario || window.addNewFuncionario || globalThis.addNewFuncionarioProxy;
+        fn?.(e);
       } catch (err) {
         console.error('[delegate] erro ao salvar funcionário:', err);
       }
@@ -548,7 +550,8 @@ function setupEventListeners() {
       if (!form) return;
       e.preventDefault();
       try {
-        (window.addNewFuncionario || globalThis.addNewFuncionarioProxy)?.(e);
+        const fn = globalThis.addNewFuncionario || window.addNewFuncionario || globalThis.addNewFuncionarioProxy;
+        fn?.(e);
       } catch (err) {
         console.error('[delegate] erro ao submeter form do funcionário:', err);
       }

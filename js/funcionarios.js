@@ -15,9 +15,11 @@ const bindIfExistsLocal = (id, handler, event = 'click') => {
 // Usa o global se existir, senão o local
 const $bind = (globalThis.bindIfExists || bindIfExistsLocal);
 
-// ---- Debug helper
+// ---- Debug helper (não quebra em browsers)
 function debugLog(...args) {
-  if (localStorage.FUNC_DEBUG) console.log('[func]', ...args);
+  if (typeof localStorage !== 'undefined' && localStorage.FUNC_DEBUG) {
+    console.log('[func]', ...args);
+  }
 }
 
 // ---- Delegation helpers (não conflitam com binds existentes)
@@ -1295,6 +1297,11 @@ export async function addNewFuncionario(ev) {
   }
 }
 
+// Export global para delegação
+if (!globalThis.addNewFuncionario) {
+  globalThis.addNewFuncionario = addNewFuncionario;
+}
+
 // ===== Binds após DOM carregado (idempotentes) =====
 document.addEventListener('DOMContentLoaded', () => {
   // salvar funcionário — botão
@@ -1360,4 +1367,18 @@ if (typeof globalThis !== 'undefined') {
     globalThis.addNewFuncionario = addNewFuncionario;
     debugLog('addNewFuncionario exported to globalThis');
   }
+}
+
+// Fallback robusto por delegação local – só registra uma vez
+if (!document.__FUNC_DELEGATE_BINDED) {
+  document.__FUNC_DELEGATE_BINDED = true;
+  document.addEventListener('click', (ev) => {
+    const btn = ev.target.closest('#btn-save-funcionario,[data-action="save-funcionario"]');
+    if (!btn) return;
+    try {
+      (globalThis.addNewFuncionario || globalThis.addNewFuncionarioProxy)?.(ev);
+    } catch (err) {
+      console.error('[func] delegate click error:', err);
+    }
+  }, { capture: false });
 }
