@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## [2025-08-13 13:40] — Hotfix funcionarios.js (shim + DOMContentLoaded)
+- Adicionado shim local para bindIfExists (evita ReferenceError quando main.js ainda não carregou)
+- Binds movidos para DOMContentLoaded para garantir DOM pronto
+- Idempotência preservada e sem impacto na UX/lógica
+
 ## [2025-08-13 13:35] — Hotfix cadastro funcionário (bind + null-safety)
 - main.js: helpers de bind/seletores confirmados/estendidos
 - funcionarios.js: addNewFuncionario com coletores tolerantes e binds idempotentes

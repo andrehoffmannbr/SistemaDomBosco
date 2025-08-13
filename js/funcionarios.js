@@ -1,3 +1,19 @@
+// --- SHIM local para evitar ReferenceError quando main.js ainda não carregou ---
+// Usa helper global se existir; caso contrário, define um binder idempotente local.
+// Mantém compatibilidade com o comportamento esperado do projeto.
+const bindIfExists = globalThis.bindIfExists || function (id, event, handler) {
+  try {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const flag = `__bound_${event}`;
+    if (el[flag]) return;            // evita bind duplo
+    el[flag] = true;
+    el.addEventListener(event, handler);
+  } catch (_) {
+    // Silencioso por segurança; não deve quebrar outras telas (ex.: login)
+  }
+};
+
 // Employee management module
 import { supabase } from '../lib/supabaseClient.js';
 import { db, hydrate } from './database.js';
@@ -1211,24 +1227,24 @@ export async function addNewFuncionario(ev) {
   }
 }
 
-// ===== Binds idempotentes do cadastro =====
-// Botão principal do modal/página
-bindIfExists?.('btn-add-funcionario', addNewFuncionario, 'click');
-
-// Fallback: qualquer botão com data-action="save-funcionario"
-(() => {
-  const btn = document.querySelector('[data-action="save-funcionario"]');
-  if (btn && !btn.__bound_click) {
-    btn.addEventListener('click', addNewFuncionario);
-    btn.__bound_click = true;
-  }
-})();
-
-// Fallback de formulário: submit do form de funcionário
-(() => {
-  const form = document.querySelector('form[data-form="funcionario"]');
-  if (form && !form.__bound_submit) {
-    form.addEventListener('submit', (e) => addNewFuncionario(e));
-    form.__bound_submit = true;
-  }
-})();
+// ===== Binds após DOM carregado (idempotentes) =====
+document.addEventListener('DOMContentLoaded', () => {
+  bindIfExists('btn-add-funcionario', 'click', addNewFuncionario);
+  try {
+    const btn = document.querySelector('[data-action="save-funcionario"]');
+    if (btn && !btn.__bound_click) {
+      btn.addEventListener('click', addNewFuncionario);
+      btn.__bound_click = true;
+    }
+  } catch {}
+  try {
+    const form = document.querySelector('form[data-form="funcionario"]');
+    if (form && !form.__bound_submit) {
+      form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        addNewFuncionario(e);
+      });
+      form.__bound_submit = true;
+    }
+  } catch {}
+});
