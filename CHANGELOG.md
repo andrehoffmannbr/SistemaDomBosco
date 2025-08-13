@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [2025-08-13 09:00] — Cadastro de Usuário (Admin/Diretor)
+- SQL: rls_profiles_users.sql — RLS de profiles (admin/director podem inserir/atualizar qualquer perfil)
+- SQL: defaults_and_constraints.sql — tab_access com DEFAULT '{}' e normalização de nulos
+- auth.js: aliases de módulos ('users'/'funcionarios'); reforço no checkTabAccessEnhanced; bypass admin/diretor mantido
+- funcionarios.js: guarda de criação baseada em checkTabAccess('users'|'funcionarios','create') e isSuperUser()
+- Observação: criação de auth.users deve seguir via Edge Function/Admin API (sem service role no browser)
+
 ## [2025-08-12 11:50] — Fix: Correção título nulo em daily_notes
 - financial.js: addDailyNote() com normalização de title/content
 - Infere title de description quando vazio, default "Sem título"

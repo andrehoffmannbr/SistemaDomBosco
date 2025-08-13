@@ -161,3 +161,42 @@ export async function updateUserPassword(userId, newPassword) {
         return false;
     }
 }
+
+// === ALIASES de módulos para checkTabAccess (não altera chaves existentes) ===
+const MODULE_ALIASES = {
+  users: ['users', 'funcionarios', 'employees'],
+  agenda: ['agenda', 'schedule', 'schedules']
+};
+
+function aliasKeys(key) {
+  const pair = Object.entries(MODULE_ALIASES).find(([, arr]) => arr.includes(key));
+  return pair ? pair[1] : [key];
+}
+
+// Reforça checkTabAccess para aceitar aliases e reduzir falsos negativos
+export function checkTabAccessEnhanced(tabKey, action = 'view') {
+  try {
+    const user = getCurrentUser();
+    const role = user?.role || null;
+
+    // bypass super user
+    if (isSuperUser?.(role)) return true;
+
+    const keys = aliasKeys(tabKey);
+    const access = user?.tab_access || user?.tabAccess || {}; // compat
+
+    // percorre aliases, se qualquer um permitir, ok
+    for (const k of keys) {
+      const rule = access?.[k];
+      if (!rule) continue;
+      // action normalizada: 'View' | 'Edit' | 'create' | 'delete'
+      if (action in rule) return !!rule[action];
+      // fallback: se pediu 'View' e existir Edit true, também considera allowed
+      if (action === 'view' && rule.Edit) return true;
+    }
+    return false;
+  } catch (e) {
+    console.warn('[checkTabAccess] fallback false:', e);
+    return false;
+  }
+}

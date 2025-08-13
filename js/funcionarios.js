@@ -791,10 +791,15 @@ export async function addFuncionario(funcionarioData) {
         return false;
     }
 
-    // Verificar se o usuário atual pode criar usuários (director ou admin)
-    const currentUser = getCurrentUser();
-    if (!isUserRoleIn(['director', 'admin'])) {
-        showNotification('Apenas diretor ou admin podem criar usuários.', 'error');
+    // Agora: permite via alias 'users'/'funcionarios'
+    const role = getCurrentUser()?.role || null;
+    const canCreate =
+        isUserRoleIn(role, ['director', 'admin']) ||
+        checkTabAccess('users', 'create') ||
+        checkTabAccess('funcionarios', 'create');
+
+    if (!canCreate) {
+        showNotification('Sem permissão para criar usuários. Peça acesso ao diretor/admin.', 'error');
         return false;
     }
 
