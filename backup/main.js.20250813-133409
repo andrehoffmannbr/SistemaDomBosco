@@ -21,11 +21,8 @@ globalThis.$val ??= (id) => {
   return (typeof v === 'string' ? v : (v ?? '')).toString().trim();
 };
 globalThis.$num ??= (id) => {
-  const raw = $val(id);
-  if (!raw) return null;
-  // aceita "1.234,56" ou "1234.56"
-  const norm = raw.replace(/\./g, '').replace(',', '.');
-  const n = Number(norm);
+  const raw = $val(id).replace(',', '.');
+  const n = Number(raw);
   return Number.isFinite(n) ? n : null;
 };
 

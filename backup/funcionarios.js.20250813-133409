@@ -6,53 +6,6 @@ import { getCurrentUser, isRoleAllowed, isUserRoleIn, ALL_ADMIN_VIEW_CLIENTS_AND
 import { showClientDetails } from './clients.js'; // Import showClientDetails to re-render client modal
 import { formatDuration } from './utils.js'; // Import duration formatting utility
 
-// ===== Cadastro de Funcionário — coletores tolerantes =====
-const FUNC_FIELD_IDS = {
-  name:    ['func-name', 'nome', 'employee-name'],
-  email:   ['func-email', 'email', 'employee-email'],
-  phone:   ['func-phone', 'telefone', 'employee-phone'],
-  cpf:     ['func-cpf', 'cpf', 'employee-cpf'],
-  role:    ['func-role', 'cargo', 'employee-role'],
-  unit:    ['func-unit', 'unidade', 'employee-unit'],
-  password:['func-password', 'senha', 'employee-password'],
-};
-
-function firstExistingId(ids) {
-  for (const id of ids) {
-    const el = document.getElementById(id);
-    if (el) return id;
-    // fallback por name=[id]
-    const byName = document.querySelector(`[name="${id}"]`);
-    if (byName) return byName.id || id;
-  }
-  return null;
-}
-
-function readField(ids, { numeric = false } = {}) {
-  const id = firstExistingId(ids);
-  if (!id) return numeric ? null : '';
-  return numeric ? ($num(id)) : ($val(id));
-}
-
-function collectTabAccess(container) {
-  // Coleta todas as permissões do container
-  const out = {};
-  const root = container || document;
-  const selects = root.querySelectorAll('select[data-tabkey]');
-  selects.forEach(sel => {
-    const key = sel.getAttribute('data-tabkey');
-    const raw = (sel.value || '').toLowerCase();
-    // normaliza 'ver'/'editar'/'sem acesso' e variantes
-    const map = {
-      'ver': 'view', 'view': 'view',
-      'editar':'edit','edit':'edit',
-      'sem acesso':'none','none':'none','': 'none'
-    };
-    out[key] = map[raw] ?? 'none';
-  });
-  return out;
-}
-
 // [B4] NEW: Centralized user profile functions
 // compat: a UI chama "users", mas persistimos em profiles
 export async function listUsers() {
@@ -1156,79 +1109,83 @@ export function initRolesManagement() {
     hideEditor();
 }
 
-// ===== addNewFuncionario — idempotente e tolerante =====
-export async function addNewFuncionario(ev) {
+// ===== NOVO: addNewFuncionario com null-safety e coleta de permissões =====
+export async function addNewFuncionario(event) {
   try {
-    if (ev?.preventDefault) ev.preventDefault();
+    event?.preventDefault?.();
 
-    // Guardas de permissão (mantêm lógica atual)
-    const role = getCurrentUser?.()?.role ?? null;
-    if (!isUserRoleIn?.(role, ['director','admin'])) {
-      showNotification?.('Sem permissão para criar usuários. Peça acesso ao diretor/admin.', 'error');
-      return;
-    }
-    if (!checkTabAccess?.('funcionarios','create') && !checkTabAccess?.('users','create')) {
-      showNotification?.('Sem permissão para criar usuários. Peça acesso ao diretor/admin.', 'error');
-      return;
-    }
+    // --- Campos básicos (null-safe)
+    // Ajuste os IDs abaixo para os que existem no seu modal de cadastro.
+    // Se os nomes forem diferentes, apenas troque aqui — não mexa em HTML.
+    const name  = $val('func-name')      || $val('novo-funcionario-nome')   || '';
+    const email = $val('func-email')     || $val('novo-funcionario-email')  || '';
+    const role  = $val('func-role')      || $val('novo-funcionario-role')   || '';
+    const unit  = $val('func-unit')      || $val('novo-funcionario-unit')   || '';
+    const password = $val('func-password') || $val('novo-funcionario-senha') || '';
 
-    // Coleta tolerante de campos
-    const name  = readField(FUNC_FIELD_IDS.name);
-    const email = readField(FUNC_FIELD_IDS.email);
-    const phone = readField(FUNC_FIELD_IDS.phone);
-    const cpf   = readField(FUNC_FIELD_IDS.cpf);
-    const cargo = readField(FUNC_FIELD_IDS.role);
-    const unidade = readField(FUNC_FIELD_IDS.unit);
-    const password = readField(FUNC_FIELD_IDS.password);
-
-    // Validação mínima
-    if (!name || !email || !password) {
-      showNotification?.('Nome, e-mail e senha são obrigatórios.', 'warning');
+    if (!name || !email || !role) {
+      showNotification('Preencha nome, e-mail e cargo.', 'error');
       return;
     }
 
-    // Coleta permissões via selects data-tabkey
-    const container = document.getElementById('func-permissions') || document;
-    const tabAccess = collectTabAccess(container);
+    // --- Permissões por aba (tab_access)
+    // Procuramos selects dentro do container de permissões; cada select deve ter data-tabkey
+    // e valores do tipo: 'none' | 'view' | 'edit'. Não muda o HTML; só lemos do que existir.
+    const tabAccess = {};
+    const permContainer =
+      document.querySelector('#permissoes-acesso') ||
+      document.querySelector('[data-permissions-container]') ||
+      document; // fallback: varremos a página inteira (último recurso)
 
-    // Reaproveita a função existente do projeto
-    await addFuncionario({
-      name,
-      email,
-      phone,
-      cpf,
-      role: cargo,
-      unit: unidade,
-      password,
-      tabAccess,
-    });
+    const selects = Array.from(
+      permContainer.querySelectorAll('select[data-tabkey], .perm-select[data-tabkey]')
+    );
 
-    showNotification?.('Funcionário cadastrado com sucesso.', 'success');
+    // Mapeia 'view'/'edit' para o JSON usado no back atual (compatível com seu formato)
+    const mapLevel = (lvl) => {
+      const v = (lvl || '').toLowerCase();
+      if (v === 'edit' || v === 'editar')    return { Edit: true, View: true };
+      if (v === 'view' || v === 'ver')       return { View: true };
+      // 'none' | 'sem acesso' => deixar fora (fallback ao padrão do cargo) ou setar vazio
+      return {}; 
+    };
 
+    for (const sel of selects) {
+      const key = sel.dataset.tabkey?.trim();
+      if (!key) continue;
+      const raw = (sel.value || '').toString().trim();
+      const val = mapLevel(raw);
+      // Se quiser aplicar o padrão do cargo quando for "Sem Acesso", basta não definir a chave.
+      if (Object.keys(val).length > 0) tabAccess[key] = val;
+    }
+
+    // --- Monta payload (compatível com sua API/edge atual)
+    const payload = {
+      name, email, role, unit, password,
+      tab_access: tabAccess,
+    };
+
+    // --- Chamada original (mantenha sua função/edge/API)
+    // Ex.: const { error } = await supabase.from('profiles').insert(payload);
+    // ou:  await createUserEdge(payload)
+    const result = await addFuncionario(payload); // <== use seu método existente
+    if (result?.error) {
+      console.error('Erro ao criar funcionário:', result.error);
+      showNotification(result.error.message || 'Erro ao criar funcionário.', 'error');
+      return;
+    }
+
+    showNotification('Funcionário cadastrado com sucesso!', 'success');
+    await hydrate?.('funcionarios');
+    await hydrateAll?.();
+    
+    // Fechar modal se existir
+    const modal = document.getElementById('modal-novo-funcionario');
+    if (modal) {
+      modal.style.display = 'none';
+    }
   } catch (err) {
-    console.error('addNewFuncionario error:', err);
-    showNotification?.('Falha ao cadastrar funcionário. Veja o console para detalhes.', 'error');
+    console.error(err);
+    showNotification('Falha ao cadastrar funcionário (ver console).', 'error');
   }
 }
-
-// ===== Binds idempotentes do cadastro =====
-// Botão principal do modal/página
-bindIfExists?.('btn-add-funcionario', addNewFuncionario, 'click');
-
-// Fallback: qualquer botão com data-action="save-funcionario"
-(() => {
-  const btn = document.querySelector('[data-action="save-funcionario"]');
-  if (btn && !btn.__bound_click) {
-    btn.addEventListener('click', addNewFuncionario);
-    btn.__bound_click = true;
-  }
-})();
-
-// Fallback de formulário: submit do form de funcionário
-(() => {
-  const form = document.querySelector('form[data-form="funcionario"]');
-  if (form && !form.__bound_submit) {
-    form.addEventListener('submit', (e) => addNewFuncionario(e));
-    form.__bound_submit = true;
-  }
-})();

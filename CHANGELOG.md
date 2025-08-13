@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## [2025-08-13 13:35] — Hotfix cadastro funcionário (bind + null-safety)
+- main.js: helpers de bind/seletores confirmados/estendidos
+- funcionarios.js: addNewFuncionario com coletores tolerantes e binds idempotentes
+
+## [2025-08-13 09:15] — Hotfix cadastro de funcionário
+- main.js: adicionados helpers idempotentes `$el`, `$val`, `$num` e `bindIfExists` (null-safety).
+- funcionarios.js: `addNewFuncionario` refatorado para usar helpers, validações e coleta robusta de `tab_access` via `data-tabkey`.
+- Sem alterações de HTML/CSS/nome de funções públicas. Lógica de negócio preservada.
+
 ## [2025-08-13 09:00] — Cadastro de Usuário (Admin/Diretor)
 - SQL: rls_profiles_users.sql — RLS de profiles (admin/director podem inserir/atualizar qualquer perfil)
 - SQL: defaults_and_constraints.sql — tab_access com DEFAULT '{}' e normalização de nulos
