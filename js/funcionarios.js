@@ -15,11 +15,17 @@ const bindIfExistsLocal = (id, handler, event = 'click') => {
 // Usa o global se existir, senão o local
 const $bind = (globalThis.bindIfExists || bindIfExistsLocal);
 
+// ---- Debug helper
+function debugLog(...args) {
+  if (localStorage.FUNC_DEBUG) console.log('[func]', ...args);
+}
+
 // ---- Delegation helpers (não conflitam com binds existentes)
 function delegateClick(selector, handler) {
   document.addEventListener('click', (ev) => {
     const el = ev.target.closest(selector);
     if (!el) return;
+    debugLog('delegateClick triggered:', selector, el);
     try { handler(ev, el); } catch (e) { console.error('[func] delegateClick error:', e); }
   });
 }
@@ -28,11 +34,47 @@ function delegateSubmit(selector, handler) {
   document.addEventListener('submit', (ev) => {
     const form = ev.target.closest(selector);
     if (!form) return;
+    debugLog('delegateSubmit triggered:', selector, form);
     try { handler(ev, form); } catch (e) { console.error('[func] delegateSubmit error:', e); }
   });
 }
 
+// ---- Ensures binds work for dynamically injected content
+function ensureSaveFuncionarioBinds() {
+  debugLog('ensureSaveFuncionarioBinds called');
+  const btn = document.getElementById('btn-save-funcionario');
+  if (btn) {
+    debugLog('Found btn-save-funcionario, setting up direct bind');
+    $bind('btn-save-funcionario', 'click', function(ev) {
+      ev.preventDefault();
+      debugLog('Direct bind: save funcionario clicked');
+      addNewFuncionario();
+    });
+  } else {
+    debugLog('btn-save-funcionario not found, relying on delegation');
+  }
+}
+
 // Employee management module
+
+// ---- Delegation setup (runs immediately)
+debugLog('Setting up funcionarios delegation listeners');
+
+// Delegation for save button
+delegateClick('#btn-save-funcionario, [data-action="save-funcionario"]', (ev, btn) => {
+  ev.preventDefault();
+  debugLog('Delegation: save funcionario clicked via', btn.id || btn.getAttribute('data-action'));
+  addNewFuncionario();
+});
+
+// Delegation for employee form submission
+delegateSubmit('form[data-form="funcionario"]', (ev, form) => {
+  ev.preventDefault();
+  debugLog('Delegation: employee form submitted');
+  addNewFuncionario();
+});
+
+debugLog('Funcionarios delegation setup complete');
 import { supabase } from '../lib/supabaseClient.js';
 import { db, hydrate } from './database.js';
 import { showNotification, updateGlobalSearchDatalist } from './ui.js';
@@ -1207,6 +1249,7 @@ export async function addNewFuncionario(ev) {
     }
 
     // Coleta tolerante de campos
+    debugLog('Collecting employee fields...');
     const name  = readField(FUNC_FIELD_IDS.name);
     const email = readField(FUNC_FIELD_IDS.email);
     const phone = readField(FUNC_FIELD_IDS.phone);
@@ -1214,6 +1257,8 @@ export async function addNewFuncionario(ev) {
     const cargo = readField(FUNC_FIELD_IDS.role);
     const unidade = readField(FUNC_FIELD_IDS.unit);
     const password = readField(FUNC_FIELD_IDS.password);
+    
+    debugLog('Collected fields:', {name, email, phone, cpf, cargo, unidade, password: password ? '***' : null});
 
     // Validação mínima
     if (!name || !email || !password) {
@@ -1296,3 +1341,9 @@ document.addEventListener('DOMContentLoaded', () => {
     try { fn(); } catch (e) { console.error('[func] erro no submit (delegation):', e); }
   });
 })();
+
+// ---- Export to globalThis for cross-module access
+if (typeof globalThis !== 'undefined') {
+  globalThis.ensureSaveFuncionarioBinds = ensureSaveFuncionarioBinds;
+  debugLog('ensureSaveFuncionarioBinds exported to globalThis');
+}

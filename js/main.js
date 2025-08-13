@@ -102,6 +102,11 @@ if (!globalThis.addNewFuncionarioProxy && typeof addNewFuncionarioProxy === 'fun
   globalThis.addNewFuncionarioProxy = addNewFuncionarioProxy;
 }
 
+// Export ensureSaveFuncionarioBinds when funcionarios module loads
+globalThis.ensureSaveFuncionarioBinds = globalThis.ensureSaveFuncionarioBinds || (() => {
+  console.log('[main] ensureSaveFuncionarioBinds fallback - funcionarios module not yet loaded');
+});
+
 // onPage: retorna true quando o container existe (sem depender de roteador)
 globalThis.onPage ??= (rootId) => !!el(rootId);
 
