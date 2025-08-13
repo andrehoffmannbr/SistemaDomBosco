@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## [2025-08-13 17:00] — Hotfix Funcionários (bind + export)
+- Corrigida a ordem do bind em `btn-save-funcionario` para (id, handler, event)
+- Exportada `addNewFuncionario` em `globalThis` para suportar delegação
+- Alterações idempotentes; sem impacto em UX ou lógica de negócio
+
 ## [2025-08-13 16:45] — Hotfix cadastro de funcionários (delegação resiliente)
 - Adicionada delegação de eventos para #btn-save-funcionario e form[data-form="funcionario"]
 - Mantidos binds existentes; compatível com modal e conteúdo injetado após DOMContentLoaded

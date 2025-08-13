@@ -45,11 +45,12 @@ function ensureSaveFuncionarioBinds() {
   const btn = document.getElementById('btn-save-funcionario');
   if (btn) {
     debugLog('Found btn-save-funcionario, setting up direct bind');
-    $bind('btn-save-funcionario', 'click', function(ev) {
+    // bindIfExists/$bind espera (id, handler, event)
+    $bind('btn-save-funcionario', function(ev) {
       ev.preventDefault();
       debugLog('Direct bind: save funcionario clicked');
       addNewFuncionario();
-    });
+    }, 'click');
   } else {
     debugLog('btn-save-funcionario not found, relying on delegation');
   }
@@ -1346,4 +1347,7 @@ document.addEventListener('DOMContentLoaded', () => {
 if (typeof globalThis !== 'undefined') {
   globalThis.ensureSaveFuncionarioBinds = ensureSaveFuncionarioBinds;
   debugLog('ensureSaveFuncionarioBinds exported to globalThis');
+  // Garante que os listeners de delegação (em qualquer arquivo) consigam chamar
+  globalThis.addNewFuncionario = globalThis.addNewFuncionario || addNewFuncionario;
+  debugLog('addNewFuncionario exported to globalThis');
 }
