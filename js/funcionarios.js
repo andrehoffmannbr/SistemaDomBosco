@@ -15,6 +15,23 @@ const bindIfExistsLocal = (id, handler, event = 'click') => {
 // Usa o global se existir, senão o local
 const $bind = (globalThis.bindIfExists || bindIfExistsLocal);
 
+// ---- Delegation helpers (não conflitam com binds existentes)
+function delegateClick(selector, handler) {
+  document.addEventListener('click', (ev) => {
+    const el = ev.target.closest(selector);
+    if (!el) return;
+    try { handler(ev, el); } catch (e) { console.error('[func] delegateClick error:', e); }
+  });
+}
+
+function delegateSubmit(selector, handler) {
+  document.addEventListener('submit', (ev) => {
+    const form = ev.target.closest(selector);
+    if (!form) return;
+    try { handler(ev, form); } catch (e) { console.error('[func] delegateSubmit error:', e); }
+  });
+}
+
 // Employee management module
 import { supabase } from '../lib/supabaseClient.js';
 import { db, hydrate } from './database.js';
@@ -1247,3 +1264,35 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   } catch (_) {}
 });
+
+// ---- Delegação à prova de modal/conteúdo tardio
+(function setupFuncionarioDelegates() {
+  // Clique no botão salvar (id ou fallback data-action)
+  delegateClick('#btn-save-funcionario, [data-action="save-funcionario"]', (ev, btn) => {
+    ev.preventDefault();
+    // Preferir proxy se existir
+    const fn =
+      (typeof globalThis.addNewFuncionarioProxy === 'function' && globalThis.addNewFuncionarioProxy) ||
+      (typeof globalThis.addNewFuncionario === 'function' && globalThis.addNewFuncionario) ||
+      (typeof addNewFuncionario === 'function' && addNewFuncionario);
+    if (!fn) {
+      console.warn('[func] Nenhuma função de cadastro encontrada (addNewFuncionarioProxy/addNewFuncionario).');
+      return;
+    }
+    try { fn(); } catch (e) { console.error('[func] erro ao salvar funcionário (delegation):', e); }
+  });
+
+  // Submit do form (garante enter/submit nativo sem reload)
+  delegateSubmit('form[data-form="funcionario"]', (ev, form) => {
+    ev.preventDefault();
+    const fn =
+      (typeof globalThis.addNewFuncionarioProxy === 'function' && globalThis.addNewFuncionarioProxy) ||
+      (typeof globalThis.addNewFuncionario === 'function' && globalThis.addNewFuncionario) ||
+      (typeof addNewFuncionario === 'function' && addNewFuncionario);
+    if (!fn) {
+      console.warn('[func] Nenhuma função de cadastro encontrada no submit.');
+      return;
+    }
+    try { fn(); } catch (e) { console.error('[func] erro no submit (delegation):', e); }
+  });
+})();

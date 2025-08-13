@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## [2025-08-13 16:45] — Hotfix cadastro de funcionários (delegação resiliente)
+- Adicionada delegação de eventos para #btn-save-funcionario e form[data-form="funcionario"]
+- Mantidos binds existentes; compatível com modal e conteúdo injetado após DOMContentLoaded
+- Exportados helpers withSubmit e addNewFuncionarioProxy para globalThis
+- Sistema agora funciona mesmo com conteúdo tardio via AJAX/modal
+
 ## [2025-08-13 16:30] — Verificação Final de Binds/Modal Funcionários
 - index.html: form[data-form="funcionario"], #btn-save-funcionario, campos #func-* e selects com data-tabkey (incl. 'cadastro') verificados.
 - js/main.js: binds padronizados (id, handler, event) confirmados.

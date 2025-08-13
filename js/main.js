@@ -96,6 +96,12 @@ function addNewFuncionarioProxy(e) {
   try { showNotification('Ação indisponível no momento.', 'error'); } catch(_) {}
 }
 
+// Export helpers to globalThis if not already there
+if (!globalThis.withSubmit) globalThis.withSubmit = withSubmit;
+if (!globalThis.addNewFuncionarioProxy && typeof addNewFuncionarioProxy === 'function') {
+  globalThis.addNewFuncionarioProxy = addNewFuncionarioProxy;
+}
+
 // onPage: retorna true quando o container existe (sem depender de roteador)
 globalThis.onPage ??= (rootId) => !!el(rootId);
 
@@ -516,6 +522,33 @@ function setupEventListeners() {
         logout();
         showLoginScreen();
     }, 'click');
+
+    // ─────────────────────────────────────────────────────────────
+    // DELEGAÇÃO DE EVENTOS — CADASTRAR FUNCIONÁRIO (à prova de modal tardio)
+    // Captura clique no botão de salvar e submit do form, mesmo se o modal
+    // for injetado depois do DOMContentLoaded ou se algum bind falhar.
+    document.addEventListener('click', (e) => {
+      const btn = e.target.closest('#btn-save-funcionario,[data-action="save-funcionario"]');
+      if (!btn) return;
+      e.preventDefault();
+      try {
+        (window.addNewFuncionario || globalThis.addNewFuncionarioProxy)?.(e);
+      } catch (err) {
+        console.error('[delegate] erro ao salvar funcionário:', err);
+      }
+    }, false);
+
+    document.addEventListener('submit', (e) => {
+      const form = e.target?.closest('form[data-form="funcionario"]');
+      if (!form) return;
+      e.preventDefault();
+      try {
+        (window.addNewFuncionario || globalThis.addNewFuncionarioProxy)?.(e);
+      } catch (err) {
+        console.error('[delegate] erro ao submeter form do funcionário:', err);
+      }
+    }, false);
+    // ─────────────────────────────────────────────────────────────
 
     // Tab navigation
     Array.from(document.querySelectorAll('.tab-button')).forEach(button => {
