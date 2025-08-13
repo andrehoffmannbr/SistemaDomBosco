@@ -4,6 +4,7 @@
 - Corrigida a ordem do bind em `btn-save-funcionario` para (id, handler, event)
 - Exportada `addNewFuncionario` em `globalThis` para suportar delegação
 - Alterações idempotentes; sem impacto em UX ou lógica de negócio
+  - Obs.: garante funcionamento do botão "Cadastrar Funcionário" mesmo com delegação/document-level listeners ativos.
 
 ## [2025-08-13 16:45] — Hotfix cadastro de funcionários (delegação resiliente)
 - Adicionada delegação de eventos para #btn-save-funcionario e form[data-form="funcionario"]

@@ -45,12 +45,16 @@ function ensureSaveFuncionarioBinds() {
   const btn = document.getElementById('btn-save-funcionario');
   if (btn) {
     debugLog('Found btn-save-funcionario, setting up direct bind');
-    // bindIfExists/$bind espera (id, handler, event)
-    $bind('btn-save-funcionario', function(ev) {
-      ev.preventDefault();
-      debugLog('Direct bind: save funcionario clicked');
-      addNewFuncionario();
-    }, 'click');
+    // bindIfExists/$bind espera (id, handler, event) — ordem corrigida
+    $bind(
+      'btn-save-funcionario',
+      function (ev) {
+        ev.preventDefault();
+        debugLog('Direct bind: save funcionario clicked');
+        addNewFuncionario();
+      },
+      'click'
+    );
   } else {
     debugLog('btn-save-funcionario not found, relying on delegation');
   }
@@ -1345,9 +1349,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // ---- Export to globalThis for cross-module access
 if (typeof globalThis !== 'undefined') {
-  globalThis.ensureSaveFuncionarioBinds = ensureSaveFuncionarioBinds;
-  debugLog('ensureSaveFuncionarioBinds exported to globalThis');
-  // Garante que os listeners de delegação (em qualquer arquivo) consigam chamar
-  globalThis.addNewFuncionario = globalThis.addNewFuncionario || addNewFuncionario;
-  debugLog('addNewFuncionario exported to globalThis');
+  // ---- Export block (garante helpers globais de delegação)
+  if (!globalThis.ensureSaveFuncionarioBinds) {
+    globalThis.ensureSaveFuncionarioBinds = ensureSaveFuncionarioBinds;
+    debugLog('ensureSaveFuncionarioBinds exported to globalThis');
+  }
+  // Export adicional para delegação em main.js
+  // (idempotente — só define caso ainda não exista)
+  if (!globalThis.addNewFuncionario) {
+    globalThis.addNewFuncionario = addNewFuncionario;
+    debugLog('addNewFuncionario exported to globalThis');
+  }
 }
