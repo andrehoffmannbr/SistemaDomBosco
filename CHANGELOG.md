@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## [2025-08-14 08:30] — Finalização Modal Funcionários
+- main.js: adicionado handler idempotente para `btn-add-funcionario` (abre modal)
+- Verificação de permissão com `checkTabAccess('funcionarios', 'edit')`
+- Reset automático do formulário e chamada a `ensureSaveFuncionarioBinds()`
+- Fluxo completo: Adicionar → Modal → Reset → Binds → Salvar/Submit
+
 ## [2025-08-14 08:00] — Cleanup Final (Funcionários)
 - funcionarios.js: removida duplicação de delegações (agora única cadeia de handlers)
 - funcionarios.js: removido fallback `__FUNC_DELEGATE_BINDED` desnecessário

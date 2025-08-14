@@ -1032,7 +1032,26 @@ function setupEventListeners() {
     }
 
     // O botão "Adicionar Novo Funcionário" deve apenas abrir o modal
-    // (nenhum bind para cadastro aqui)
+    // (nenhum bind de cadastro aqui) — adiciona handler idempotente
+    bindIfExists('btn-add-funcionario', () => {
+        // Permissão: precisa poder editar funcionários
+        if (!checkTabAccess('funcionarios', 'edit')) {
+            showNotification('Você não tem permissão para cadastrar funcionários.', 'error');
+            return;
+        }
+        try {
+            // Reset do formulário e abertura do modal
+            const form = document.getElementById('form-add-funcionario');
+            if (form) form.reset();
+            const modal = document.getElementById('modal-add-funcionario');
+            if (modal) modal.style.display = 'flex';
+
+            // Garante que o botão SALVAR/submit já estejam ligados
+            (globalThis.ensureSaveFuncionarioBinds || window.ensureSaveFuncionarioBinds)?.();
+        } catch (e) {
+            console.error('[func] erro ao abrir modal de novo funcionário:', e);
+        }
+    }, 'click');
 
     // Bind correto: botão SALVAR (no modal) e SUBMIT do formulário.
     // Use ambos para maior compatibilidade.
