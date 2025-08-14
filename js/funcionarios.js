@@ -53,7 +53,13 @@ function ensureSaveFuncionarioBinds() {
       function (ev) {
         ev.preventDefault();
         debugLog('Direct bind: save funcionario clicked');
-        addNewFuncionario();
+        (
+          globalThis.addNewFuncionario
+          || window.addNewFuncionario
+          || globalThis.addNewFuncionarioProxy
+          || (typeof addNewFuncionarioProxy === 'function' && addNewFuncionarioProxy)
+          || addNewFuncionario
+        )?.(ev) || console.warn('[func] Direct bind sem rotina de cadastro (addNewFuncionario/Proxy).');
       },
       'click'
     );
@@ -92,8 +98,14 @@ delegateClick('#btn-save-funcionario, [data-action="save-funcionario"]', (ev, bt
   ev.preventDefault();
   debugLog('Delegation: save funcionario clicked via', btn.id || btn.getAttribute('data-action'));
   try {
-    // prioridade a handler global, cai para o local se necessário
-    (globalThis.addNewFuncionario || window.addNewFuncionario || addNewFuncionario)?.(ev);
+    // prioridade a handler global; cai para o proxy; por fim tenta local
+    (
+      globalThis.addNewFuncionario
+      || window.addNewFuncionario
+      || globalThis.addNewFuncionarioProxy
+      || (typeof addNewFuncionarioProxy === 'function' && addNewFuncionarioProxy)
+      || addNewFuncionario
+    )?.(ev) || console.warn('[func] Nenhuma rotina de cadastro encontrada (addNewFuncionario/Proxy ausentes).');
   } catch (e) {
     console.error('[func] addNewFuncionario (delegation) error:', e);
     try { showNotification('Não foi possível salvar o funcionário no momento.', 'error'); } catch {}
@@ -105,7 +117,13 @@ delegateSubmit('form[data-form="funcionario"]', (ev, form) => {
   ev.preventDefault();
   debugLog('Delegation: employee form submitted');
   try {
-    (globalThis.addNewFuncionario || window.addNewFuncionario || addNewFuncionario)?.(ev);
+    (
+      globalThis.addNewFuncionario
+      || window.addNewFuncionario
+      || globalThis.addNewFuncionarioProxy
+      || (typeof addNewFuncionarioProxy === 'function' && addNewFuncionarioProxy)
+      || addNewFuncionario
+    )?.(ev) || console.warn('[func] Submit sem rotina de cadastro (addNewFuncionario/Proxy).');
   } catch (e) {
     console.error('[func] addNewFuncionario (submit) error:', e);
     try { showNotification('Não foi possível salvar o funcionário no momento.', 'error'); } catch {}
