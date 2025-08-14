@@ -1022,12 +1022,14 @@ export async function addFuncionario() {
       ? collectTabAccess(document.getElementById('permissoes-funcionario'))
       : {};
 
+    const funcionarioData = { email, password, name, role, tab_access };
+
+    // Guarda de campos obrigatórios no cliente — evita 400 sem corpo
     if (!email || !password || !name) {
-      showNotification('Email, senha e nome são obrigatórios.', 'warning');
+      showNotification('Atenção', 'Email, senha e nome são obrigatórios.', 'warning');
+      console.warn('[func] bloqueado no cliente: campos obrigatórios ausentes', { email, hasPassword: !!password, hasName: !!name });
       return;
     }
-
-    const funcionarioData = { email, password, name, role, tab_access };
 
     // CHAMADA ÚNICA — sem fetch, sem URL hardcoded
     const { data, error } = await supabase.functions.invoke('create-user', { body: funcionarioData });
@@ -1059,6 +1061,19 @@ export async function addFuncionario() {
       } catch {
         // ignora; ficará a msg padrão do SDK
       }
+    }
+    // Fallback: algumas versões do SDK popularam "context.body" (string)
+    if (!backend && error?.context?.body) {
+      try {
+        const j = JSON.parse(error.context.body);
+        backend = j?.error || j?.message || String(error.context.body);
+      } catch {
+        backend = String(error.context.body);
+      }
+    }
+    // Último fallback: própria mensagem do erro
+    if (!backend && error?.message) {
+      backend = error.message;
     }
 
     if (error || !data?.ok) {
