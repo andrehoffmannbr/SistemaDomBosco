@@ -54,12 +54,10 @@ function ensureSaveFuncionarioBinds() {
         ev.preventDefault();
         debugLog('Direct bind: save funcionario clicked');
         (
-          globalThis.addNewFuncionario
-          || window.addNewFuncionario
-          || globalThis.addNewFuncionarioProxy
-          || (typeof addNewFuncionarioProxy === 'function' && addNewFuncionarioProxy)
-          || addNewFuncionario
-        )?.(ev) || console.warn('[func] Direct bind sem rotina de cadastro (addNewFuncionario/Proxy).');
+          globalThis.addFuncionario
+          || window.addFuncionario
+          || addFuncionario
+        )?.(ev) || console.warn('[func] Direct bind sem rotina de cadastro (addFuncionario).');
       },
       'click'
     );
@@ -101,12 +99,10 @@ delegateSubmit('form[data-form="funcionario"]', (ev, form) => {
   debugLog('Delegation: employee form submitted');
   try {
     (
-      globalThis.addNewFuncionario
-      || window.addNewFuncionario
-      || globalThis.addNewFuncionarioProxy
-      || (typeof addNewFuncionarioProxy === 'function' && addNewFuncionarioProxy)
-      || addNewFuncionario
-    )?.(ev) || console.warn('[func] Submit sem rotina de cadastro (addNewFuncionario/Proxy).');
+      globalThis.addFuncionario
+      || window.addFuncionario
+      || addFuncionario
+    )?.(ev) || console.warn('[func] Submit sem rotina de cadastro (addFuncionario).');
   } catch (e) {
     console.error('[func] addNewFuncionario (submit) error:', e);
     try { showNotification('Não foi possível salvar o funcionário no momento.', 'error'); } catch {}
@@ -1004,76 +1000,68 @@ export function deleteFuncionario(funcionarioId) {
     updateGlobalSearchDatalist();
 }
 
-export async function addFuncionario(funcionarioData) {
-    // Check if the current user has edit access to the 'funcionarios' tab
-    if (!checkTabAccess('funcionarios', 'edit')) {
-        showNotification('Você não tem permissão para adicionar funcionários.', 'error');
-        return false;
+// (NOVA) Envia cadastro via SDK: supabase.functions.invoke
+export async function addFuncionario() {
+  try {
+    const btn   = document.getElementById('btn-save-funcionario');
+    const form  = document.getElementById('form-add-funcionario');
+
+    // evita reentrância
+    if (globalThis.__savingFuncionario) return;
+    globalThis.__savingFuncionario = true;
+    if (btn) setLoading(btn, true);
+
+    // coleta dos campos
+    const email = (document.getElementById('new-funcionario-username')?.value || '').trim();
+    const password = (document.getElementById('func-password')?.value || '').trim();
+    const name = (document.getElementById('func-name')?.value || '').trim();
+    const role = (document.getElementById('func-role')?.value || '') || null; // opcional
+
+    // permissões por aba (já existe helper collectTabAccess; manter)
+    const tab_access = (typeof collectTabAccess === 'function')
+      ? collectTabAccess(document.getElementById('permissoes-funcionario'))
+      : {};
+
+    if (!email || !password || !name) {
+      showNotification('Email, senha e nome são obrigatórios.', 'warning');
+      return;
     }
 
-    // Agora: permite via alias 'users'/'funcionarios'
-    const role = getCurrentUser()?.role || null;
-    const canCreate =
-        isUserRoleIn(role, ['director', 'admin']) ||
-        checkTabAccess('users', 'create') ||
-        checkTabAccess('funcionarios', 'create');
+    const funcionarioData = { email, password, name, role, tab_access };
 
-    if (!canCreate) {
-        showNotification('Sem permissão para criar usuários. Peça acesso ao diretor/admin.', 'error');
-        return false;
+    // CHAMADA ÚNICA — sem fetch, sem URL hardcoded
+    const { data, error } = await supabase.functions.invoke('create-user', { body: funcionarioData });
+
+    if (error || !data?.ok) {
+      const raw = error?.message || data?.error || '';
+      const msg = /already|exist|email/i.test(raw)
+        ? 'E-mail já cadastrado. Use outro e-mail.'
+        : /cors|failed to fetch/i.test(raw)
+          ? 'Falha de comunicação com o servidor (CORS). Avise o administrador.'
+          : (raw || 'Erro ao criar funcionário. Tente novamente.');
+      console.error('[func] addFuncionario error:', raw);
+      showNotification(msg, 'error');
+      return;
     }
 
-    // Validar dados obrigatórios (cargo é apenas rótulo → opcional)
-    if (!funcionarioData.email || !funcionarioData.password || !funcionarioData.name) {
-        showNotification('Email, senha e nome são obrigatórios.', 'error');
-        return false;
-    }
-
-    if (funcionarioData.password.length < 6) {
-        showNotification('A senha deve ter pelo menos 6 caracteres.', 'error');
-        return false;
-    }
-
-    try {
-        showNotification('Criando usuário...', 'info');
-
-        // Chamada para criar usuário (via invoke)
-        const { data, error } = await supabase.functions.invoke('create-user', {
-            body: funcionarioData,
-        });
-        if (error || !data?.ok) {
-            const msg = (error?.message || data?.error || '').toLowerCase();
-            if (msg.includes('already') || msg.includes('email') || msg.includes('user exists')) {
-                throw new Error('E-mail já cadastrado. Use outro e-mail.');
-            }
-            throw new Error(error?.message || data?.error || 'Falha ao criar usuário.');
-        }
-        await hydrate('users');
-        showNotification(`Funcionário "${funcionarioData.name}" criado com sucesso!`, 'success');
-        
-        // Limpar formulário se existir (IDs corretos do modal de add)
-        const form = document.getElementById('form-add-funcionario');
-        if (form) {
-            form.reset();
-        }
-
-        // Fechar modal se existir
-        const modal = document.getElementById('modal-add-funcionario');
-        if (modal) {
-            modal.style.display = 'none';
-        }
-
-        // Atualizar lista de funcionários
-        renderFuncionarioList();
-        updateGlobalSearchDatalist();
-
-        return data.user;
-
-    } catch (error) {
-        console.error('Erro ao criar funcionário:', error);
-        showNotification(`Erro ao criar funcionário: ${error.message}`, 'error');
-        return false;
-    }
+    // SUCESSO
+    showNotification('Funcionário cadastrado com sucesso.', 'success');
+    if (typeof hydrate === 'function') hydrate('users');
+    if (form) form.reset();
+    const modal = document.getElementById('modal-add-funcionario');
+    if (modal) modal.style.display = 'none';
+  } catch (err) {
+    const raw = (err && err.message) ? err.message : String(err);
+    console.error('[func] addFuncionario exception:', raw);
+    const msg = /cors|failed to fetch/i.test(raw)
+      ? 'Falha de comunicação com o servidor (CORS). Avise o administrador.'
+      : 'Erro ao criar funcionário. Tente novamente.';
+    showNotification(msg, 'error');
+  } finally {
+    globalThis.__savingFuncionario = false;
+    const btn = document.getElementById('btn-save-funcionario');
+    if (btn) setLoading(btn, false);
+  }
 }
 
 // Function to populate tab permissions dropdowns (used in add and edit modals, and permissions grid)
@@ -1370,25 +1358,8 @@ export async function addNewFuncionario(ev) {
       || document;
     const tabAccess = collectTabAccess(container);
 
-    // Reaproveita a função existente do projeto
-    await addFuncionario({
-      name,
-      email,
-      phone,
-      cpf,
-      role: cargo,
-      unit: unidade,
-      password,
-      tabAccess,
-    });
-
-    // Pós-sucesso (IDs corretos)
-    const form = document.getElementById('form-add-funcionario');
-    if (form) form.reset();
-    const modal = document.getElementById('modal-add-funcionario');
-    if (modal) modal.style.display = 'none';
-    try { await hydrate('users'); } catch(_) {}
-    showNotification('Funcionário cadastrado com sucesso!', 'success');
+    // Chama a função atualizada (sem parâmetros, coleta campos internamente)
+    await addFuncionario();
 
   } catch (err) {
     console.error('addNewFuncionario error:', err);
@@ -1424,10 +1395,19 @@ if (typeof globalThis !== 'undefined') {
     globalThis.ensureSaveFuncionarioBinds = ensureSaveFuncionarioBinds;
     debugLog('ensureSaveFuncionarioBinds exported to globalThis');
   }
-  // Export adicional para delegação em main.js
-  // (idempotente — só define caso ainda não exista)
+  // Export principal para delegação em main.js
+  if (!globalThis.addFuncionario) {
+    globalThis.addFuncionario = addFuncionario;
+    debugLog('addFuncionario exported to globalThis');
+  }
+  // Export adicional para delegação em main.js (legacy)
   if (!globalThis.addNewFuncionario) {
     globalThis.addNewFuncionario = addNewFuncionario;
     debugLog('addNewFuncionario exported to globalThis');
   }
 }
+
+// Listeners globais removidos: já existem
+// 1) bind direto via ensureSaveFuncionarioBinds()
+// 2) delegateSubmit('form[data-form="funcionario"]', ...)
+// Isso evita disparos em duplicidade.
