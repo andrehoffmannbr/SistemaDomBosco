@@ -1392,7 +1392,12 @@ export async function addNewFuncionario(ev) {
 
   } catch (err) {
     console.error('addNewFuncionario error:', err);
-    try { showNotification(err?.message || 'Não foi possível cadastrar o funcionário agora.', 'error'); } catch {}
+    const msg = String(err?.message || '').toLowerCase();
+    const isCors = msg.includes('failed to fetch') || msg.includes('cors');
+    const friendly = isCors
+      ? 'Falha de comunicação com o servidor (CORS). Avise o administrador.'
+      : (err?.message || 'Não foi possível cadastrar o funcionário agora.');
+    try { showNotification(friendly, 'error'); } catch {}
   } finally {
     globalThis.__savingFuncionario = false;
     const btn = document.getElementById('btn-save-funcionario');
