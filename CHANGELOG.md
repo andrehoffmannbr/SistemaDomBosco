@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## [2025-08-14 08:00] — Cleanup Final (Funcionários)
+- funcionarios.js: removida duplicação de delegações (agora única cadeia de handlers)
+- funcionarios.js: removido fallback `__FUNC_DELEGATE_BINDED` desnecessário
+- funcionarios.js: removido IIFE `setupFuncionarioDelegates()` duplicado
+- Mantido autorun `ensureSaveFuncionarioBinds()` e export global idempotente
+
 ## [2025-08-13 17:15] — Fix cadastro funcionário (binds & export)
 - funcionarios.js: export global idempotente de `addNewFuncionario` + fallback chain em delegations
 - main.js: chamada idempotente de `ensureSaveFuncionarioBinds()` ao abrir a aba de funcionários

@@ -73,6 +73,15 @@ try {
   }
 } catch (_) { /* no-op: segurança */ }
 
+// Autorun idempotente para garantir binds mesmo com ordem variável de scripts
+try {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', ensureSaveFuncionarioBinds, { once: true });
+  } else {
+    ensureSaveFuncionarioBinds();
+  }
+} catch (e) { console.warn('[func] autorun ensureSaveFuncionarioBinds:', e); }
+
 // Employee management module
 
 // ---- Delegation setup (runs immediately)
@@ -1344,37 +1353,7 @@ document.addEventListener('DOMContentLoaded', () => {
   } catch (_) {}
 });
 
-// ---- Delegação à prova de modal/conteúdo tardio
-(function setupFuncionarioDelegates() {
-  // Clique no botão salvar (id ou fallback data-action)
-  delegateClick('#btn-save-funcionario, [data-action="save-funcionario"]', (ev, btn) => {
-    ev.preventDefault();
-    // Preferir proxy se existir
-    const fn =
-      (typeof globalThis.addNewFuncionarioProxy === 'function' && globalThis.addNewFuncionarioProxy) ||
-      (typeof globalThis.addNewFuncionario === 'function' && globalThis.addNewFuncionario) ||
-      (typeof addNewFuncionario === 'function' && addNewFuncionario);
-    if (!fn) {
-      console.warn('[func] Nenhuma função de cadastro encontrada (addNewFuncionarioProxy/addNewFuncionario).');
-      return;
-    }
-    try { fn(); } catch (e) { console.error('[func] erro ao salvar funcionário (delegation):', e); }
-  });
-
-  // Submit do form (garante enter/submit nativo sem reload)
-  delegateSubmit('form[data-form="funcionario"]', (ev, form) => {
-    ev.preventDefault();
-    const fn =
-      (typeof globalThis.addNewFuncionarioProxy === 'function' && globalThis.addNewFuncionarioProxy) ||
-      (typeof globalThis.addNewFuncionario === 'function' && globalThis.addNewFuncionario) ||
-      (typeof addNewFuncionario === 'function' && addNewFuncionario);
-    if (!fn) {
-      console.warn('[func] Nenhuma função de cadastro encontrada no submit.');
-      return;
-    }
-    try { fn(); } catch (e) { console.error('[func] erro no submit (delegation):', e); }
-  });
-})();
+// Removido bloco duplicado; fica apenas a delegação principal no topo.
 
 // ---- Export to globalThis for cross-module access
 if (typeof globalThis !== 'undefined') {
@@ -1389,18 +1368,4 @@ if (typeof globalThis !== 'undefined') {
     globalThis.addNewFuncionario = addNewFuncionario;
     debugLog('addNewFuncionario exported to globalThis');
   }
-}
-
-// Fallback robusto por delegação local – só registra uma vez
-if (!document.__FUNC_DELEGATE_BINDED) {
-  document.__FUNC_DELEGATE_BINDED = true;
-  document.addEventListener('click', (ev) => {
-    const btn = ev.target.closest('#btn-save-funcionario,[data-action="save-funcionario"]');
-    if (!btn) return;
-    try {
-      (globalThis.addNewFuncionario || globalThis.addNewFuncionarioProxy)?.(ev);
-    } catch (err) {
-      console.error('[func] delegate click error:', err);
-    }
-  }, { capture: false });
 }
