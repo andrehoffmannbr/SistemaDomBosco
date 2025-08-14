@@ -1097,20 +1097,23 @@ export async function addFuncionario() {
 
     if (error || !data?.ok) {
       const raw = (backend || error?.message || '').trim();
-      let msg;
-      if (status === 409 || /already|exist|email/i.test(raw)) {
-        msg = 'E-mail já cadastrado. Use outro e-mail.';
-      } else if (/missing_fields|invalid_json/i.test(raw)) {
-        msg = 'Email, senha e nome são obrigatórios.';
-      } else if (/insert_profile_failed|profiles?/i.test(raw)) {
-        msg = 'Erro ao salvar perfil no banco. Verifique as colunas da tabela "profiles".';
-      } else if (/cors|failed to fetch/i.test(raw)) {
-        msg = 'Falha de comunicação com o servidor (CORS). Avise o administrador.';
-      } else if (status === 404) {
-        msg = 'Função não encontrada (create-user). Verifique o deploy e o nome.';
-      } else {
-        msg = raw || 'Erro ao criar funcionário. Tente novamente.';
+      
+      // mapeamento atual...
+      let userMessage =
+        /missing_fields|invalid_json/i.test(backend) ? 'Email, senha e nome são obrigatórios.'
+        : /insert_profile_failed/i.test(backend)      ? 'Erro ao salvar perfil no banco. Verifique as colunas da tabela "profiles".'
+        : (status === 409 || /already|exist|email/i.test(backend)) ? 'E-mail já cadastrado. Use outro e-mail.'
+        : status === 404                                       ? 'Função não encontrada (create-user).'
+        : /cors|failed to fetch/i.test(error?.message || '')             ? 'Falha de comunicação com o servidor (CORS). Avise o administrador.'
+        : null;
+
+      // Fallback explícito: alguns ambientes retornam 400 com a frase "already been registered"
+      if (!userMessage && status === 400 && /already.*registered/i.test(rawText || backend || '')) {
+        userMessage = 'E-mail já cadastrado. Use outro e-mail.';
       }
+
+      const msg = userMessage || raw || 'Erro ao criar funcionário. Tente novamente.';
+      
       console.error('[func] addFuncionario error →', {
         status,
         sdkMessage: error?.message,

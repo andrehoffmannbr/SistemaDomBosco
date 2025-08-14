@@ -35,12 +35,14 @@ Deno.serve(async (req) => {
       email_confirm: true
     })
     if (uerr) {
-      // Duplicado → 409; demais → 400
-      const isDup = /exists|already/i.test(uerr.message || '')
-      return json(
-        { ok:false, error: isDup ? 'user_already_exists' : `create_user_failed: ${uerr.message}` },
-        { status: isDup ? 409 : 400, origin:req.headers.get('Origin') }
-      )
+      const raw = String(uerr.message ?? String(uerr) ?? '').toLowerCase();
+      // casos típicos: "AuthApiError: A user with this email address has already been registered"
+      const isDup =
+        raw.includes('already') && (raw.includes('registered') || raw.includes('exists') || raw.includes('exist'));
+      if (isDup) {
+        return json({ ok: false, error: 'user_already_exists' }, { status: 409, origin:req.headers.get('Origin') });
+      }
+      return json({ ok: false, error: `create_user_failed: ${String(uerr)}` }, { status: 400, origin:req.headers.get('Origin') });
     }
 
     // Insere profile
