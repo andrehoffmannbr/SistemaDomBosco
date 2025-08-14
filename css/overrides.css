@@ -19,3 +19,28 @@
     color: #111 !important;
   }
 }
+
+/* === Spinner básico para botões com .is-loading === */
+.btn.is-loading {
+  position: relative;
+  pointer-events: none;
+  opacity: 0.85;
+}
+.btn.is-loading::after {
+  content: "";
+  position: absolute;
+  right: 0.75rem;
+  top: 50%;
+  width: 16px;
+  height: 16px;
+  margin-top: -8px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  animation: spin 0.75s linear infinite;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+/* Acessibilidade */
+.btn[aria-busy="true"] { cursor: progress; }

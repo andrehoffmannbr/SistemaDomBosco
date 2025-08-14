@@ -169,6 +169,22 @@ function collectTabAccess(container) {
   return out;
 }
 
+// ---- UI helpers: loading/spinner para botões
+function setLoading(btn, loading = true) {
+  try {
+    if (!btn) return;
+    if (loading) {
+      btn.classList.add('is-loading');
+      btn.setAttribute('aria-busy', 'true');
+      btn.disabled = true;
+    } else {
+      btn.classList.remove('is-loading');
+      btn.removeAttribute('aria-busy');
+      btn.disabled = false;
+    }
+  } catch (_) {}
+}
+
 // ---- Roles (cargos) helpers
 function getKnownRoles() {
   // 1) Cargos padrão vindos das constantes (quando disponíveis)
@@ -1007,9 +1023,9 @@ export async function addFuncionario(funcionarioData) {
         return false;
     }
 
-    // Validar dados obrigatórios
-    if (!funcionarioData.email || !funcionarioData.password || !funcionarioData.name || !funcionarioData.role) {
-        showNotification('Email, senha, nome e cargo são obrigatórios.', 'error');
+    // Validar dados obrigatórios (cargo é apenas rótulo → opcional)
+    if (!funcionarioData.email || !funcionarioData.password || !funcionarioData.name) {
+        showNotification('Email, senha e nome são obrigatórios.', 'error');
         return false;
     }
 
@@ -1021,34 +1037,28 @@ export async function addFuncionario(funcionarioData) {
     try {
         showNotification('Criando usuário...', 'info');
 
-        // payload: { email, password, name, role, tab_access }
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session?.access_token) {
-            throw new Error('Sessão expirada. Faça login novamente.');
-        }
-        const res = await fetch('https://iyukvodgqagaedomwxcs.supabase.co/functions/v1/create-user', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${session.access_token}`
-            },
-            body: JSON.stringify(funcionarioData)
+        // Chamada para criar usuário (via invoke)
+        const { data, error } = await supabase.functions.invoke('create-user', {
+            body: funcionarioData,
         });
-        const data = await res.json();
-        if (!res.ok || !data.success) {
-            throw new Error(data.error || 'Falha ao criar usuário');
+        if (error || !data?.ok) {
+            const msg = (error?.message || data?.error || '').toLowerCase();
+            if (msg.includes('already') || msg.includes('email') || msg.includes('user exists')) {
+                throw new Error('E-mail já cadastrado. Use outro e-mail.');
+            }
+            throw new Error(error?.message || data?.error || 'Falha ao criar usuário.');
         }
         await hydrate('users');
         showNotification(`Funcionário "${funcionarioData.name}" criado com sucesso!`, 'success');
         
-        // Limpar formulário se existir
-        const form = document.getElementById('form-novo-funcionario');
+        // Limpar formulário se existir (IDs corretos do modal de add)
+        const form = document.getElementById('form-add-funcionario');
         if (form) {
             form.reset();
         }
 
         // Fechar modal se existir
-        const modal = document.getElementById('modal-novo-funcionario');
+        const modal = document.getElementById('modal-add-funcionario');
         if (modal) {
             modal.style.display = 'none';
         }
@@ -1315,11 +1325,11 @@ export function initRolesManagement() {
 
 // ===== addNewFuncionario — idempotente e tolerante =====
 export async function addNewFuncionario(ev) {
-  // anti-duplo clique
+  // Anti-duplo clique + spinner
   if (globalThis.__savingFuncionario) return;
   globalThis.__savingFuncionario = true;
   const btn = document.getElementById('btn-save-funcionario');
-  if (btn) btn.disabled = true;
+  setLoading(btn, true);
 
   try {
     if (ev?.preventDefault) ev.preventDefault();
@@ -1372,14 +1382,21 @@ export async function addNewFuncionario(ev) {
       tabAccess,
     });
 
-    showNotification?.('Funcionário cadastrado com sucesso.', 'success');
+    // Pós-sucesso (IDs corretos)
+    const form = document.getElementById('form-add-funcionario');
+    if (form) form.reset();
+    const modal = document.getElementById('modal-add-funcionario');
+    if (modal) modal.style.display = 'none';
+    try { await hydrate('users'); } catch(_) {}
+    showNotification('Funcionário cadastrado com sucesso!', 'success');
 
   } catch (err) {
     console.error('addNewFuncionario error:', err);
-    showNotification?.('Falha ao cadastrar funcionário. Veja o console para detalhes.', 'error');
+    try { showNotification(err?.message || 'Não foi possível cadastrar o funcionário agora.', 'error'); } catch {}
   } finally {
     globalThis.__savingFuncionario = false;
-    if (btn) btn.disabled = false;
+    const btn = document.getElementById('btn-save-funcionario');
+    setLoading(btn, false);
   }
 }
 
