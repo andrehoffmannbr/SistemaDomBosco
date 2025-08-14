@@ -1032,31 +1032,59 @@ export async function addFuncionario() {
     // CHAMADA ÚNICA — sem fetch, sem URL hardcoded
     const { data, error } = await supabase.functions.invoke('create-user', { body: funcionarioData });
 
-    // Normaliza resposta mesmo em erro (SDK popula `error` e muitas vezes também `data`)
-    const status = error?.context?.status ?? null;
-    // `data` pode vir string/objeto; tentamos extrair a mensagem do backend
+    // --- Diagnóstico detalhado (lendo ReadableStream do SDK) ---
+    const status =
+      error?.context?.response?.status ??
+      error?.context?.status ??
+      null;
+
     let backend = '';
-    try {
-      if (data && typeof data === 'object') backend = data.error || data.message || '';
-      else if (typeof data === 'string') {
-        try { backend = JSON.parse(data).error || JSON.parse(data).message || ''; } catch {}
+    // 1) às vezes a function devolve { ok:false, error } em "data"
+    if (data && typeof data === 'object') {
+      backend = data.error || data.message || '';
+    }
+    // 2) quando é non-2xx, o SDK fornece um Response (ReadableStream) em error.context.response
+    if (!backend && error?.context?.response) {
+      try {
+        const res = error.context.response.clone();
+        const text = await res.text();
+        backend = (() => {
+          try {
+            const j = JSON.parse(text);
+            return j?.error || j?.message || text;
+          } catch {
+            return text;
+          }
+        })();
+      } catch {
+        // ignora; ficará a msg padrão do SDK
       }
-    } catch {}
-    if (!backend && error?.context?.body) {
-      try { backend = JSON.parse(error.context.body)?.error || ''; }
-      catch { backend = String(error.context.body || ''); }
     }
 
     if (error || !data?.ok) {
       const raw = (backend || error?.message || '').trim();
       let msg;
-      if (status === 409 || /already|exist|email/i.test(raw))      msg = 'E-mail já cadastrado. Use outro e-mail.';
-      else if (/missing_fields|invalid_json/i.test(raw))           msg = 'Email, senha e nome são obrigatórios.';
-      else if (/insert_profile_failed|profiles?/i.test(raw))       msg = 'Erro ao salvar perfil. Verifique as colunas da tabela "profiles".';
-      else if (/cors|failed to fetch/i.test(raw))                  msg = 'Falha de comunicação com o servidor (CORS). Avise o administrador.';
-      else if (status === 404)                                     msg = 'Função não encontrada (create-user). Verifique o deploy e o nome.';
-      else                                                         msg = raw || 'Erro ao criar funcionário. Tente novamente.';
-      console.error('[func] addFuncionario error →', { status, sdkMessage: error?.message, backendMessage: backend, responseBody: error?.context?.body ?? null, data });
+      if (status === 409 || /already|exist|email/i.test(raw)) {
+        msg = 'E-mail já cadastrado. Use outro e-mail.';
+      } else if (/missing_fields|invalid_json/i.test(raw)) {
+        msg = 'Email, senha e nome são obrigatórios.';
+      } else if (/insert_profile_failed|profiles?/i.test(raw)) {
+        msg = 'Erro ao salvar perfil no banco. Verifique as colunas da tabela "profiles".';
+      } else if (/cors|failed to fetch/i.test(raw)) {
+        msg = 'Falha de comunicação com o servidor (CORS). Avise o administrador.';
+      } else if (status === 404) {
+        msg = 'Função não encontrada (create-user). Verifique o deploy e o nome.';
+      } else {
+        msg = raw || 'Erro ao criar funcionário. Tente novamente.';
+      }
+      console.error('[func] addFuncionario error →', {
+        status,
+        sdkMessage: error?.message,
+        backendMessage: backend,
+        responseBodyText: backend || null,
+        responseStatus: error?.context?.response?.status ?? null,
+        data,
+      });
       showNotification('Erro', msg, 'error');
       return;
     }
