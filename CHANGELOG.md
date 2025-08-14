@@ -1,5 +1,19 @@
 # CHANGELOG
 
+## [2025-08-14 09:30] — Finalização "Novo Usuário" (delegação única)
+- main.js: removida delegação global duplicada de salvar/submit funcionário
+- Mantém: funcionarios.js com bind direto + delegateSubmit + container correto
+- Fluxo: cargo=string representativo, tab_access=JSON por aba via collectTabAccess
+- Pós-sucesso: hydrate('users') + fecha modal + limpa form já implementados
+- **Resultado: 1 clique = 1 execução, sem toasts duplicados**
+
+## [2025-08-14 09:00] — Centralização e Simplificação Final (Funcionários)
+- funcionarios.js: corrigido container de permissões para `permissoes-funcionario`
+- funcionarios.js: removido `delegateClick` do botão (evita disparo duplo)
+- funcionarios.js: removido bloco redundante de binds em `DOMContentLoaded`
+- main.js: removidos binds de salvar/submit (centralizados em funcionarios.js)
+- Arquitetura final: 1 bind direto + 1 delegateSubmit + 1 handler de abertura
+
 ## [2025-08-14 08:30] — Finalização Modal Funcionários
 - main.js: adicionado handler idempotente para `btn-add-funcionario` (abre modal)
 - Verificação de permissão com `checkTabAccess('funcionarios', 'edit')`

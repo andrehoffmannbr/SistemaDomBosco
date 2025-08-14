@@ -528,35 +528,7 @@ function setupEventListeners() {
         showLoginScreen();
     }, 'click');
 
-    // ─────────────────────────────────────────────────────────────
-    // DELEGAÇÃO DE EVENTOS — CADASTRAR FUNCIONÁRIO (à prova de modal tardio)
-    // Captura clique no botão de salvar e submit do form, mesmo se o modal
-    // for injetado depois do DOMContentLoaded ou se algum bind falhar.
-    document.addEventListener('click', (e) => {
-      const btn = e.target.closest('#btn-save-funcionario,[data-action="save-funcionario"]');
-      if (!btn) return;
-      e.preventDefault();
-      try {
-        // prioridade: implementação completa -> fallback proxy
-        const fn = globalThis.addNewFuncionario || window.addNewFuncionario || globalThis.addNewFuncionarioProxy;
-        fn?.(e);
-      } catch (err) {
-        console.error('[delegate] erro ao salvar funcionário:', err);
-      }
-    }, false);
-
-    document.addEventListener('submit', (e) => {
-      const form = e.target?.closest('form[data-form="funcionario"]');
-      if (!form) return;
-      e.preventDefault();
-      try {
-        const fn = globalThis.addNewFuncionario || window.addNewFuncionario || globalThis.addNewFuncionarioProxy;
-        fn?.(e);
-      } catch (err) {
-        console.error('[delegate] erro ao submeter form do funcionário:', err);
-      }
-    }, false);
-    // ─────────────────────────────────────────────────────────────
+    // (removido) delegação global de salvar funcionário — agora centralizado em js/funcionarios.js
 
     // [FUNC-BINDS] Reforça binds quando o código de funcionários já tiver sido carregado
     // (idempotente; se não existir, não quebra)
@@ -1053,19 +1025,7 @@ function setupEventListeners() {
         }
     }, 'click');
 
-    // Bind correto: botão SALVAR (no modal) e SUBMIT do formulário.
-    // Use ambos para maior compatibilidade.
-    bindIfExists('btn-save-funcionario', addNewFuncionarioProxy, 'click');
-    bindIfExists('form-add-funcionario', withSubmit(addNewFuncionarioProxy), 'submit');
-
-    // Fallback por data-attribute, se existir no seu HTML:
-    try {
-      const fallbackBtn = document.querySelector('[data-action="save-funcionario"]');
-      if (fallbackBtn && !fallbackBtn.__bound_click) {
-        fallbackBtn.addEventListener('click', (ev) => addNewFuncionarioProxy(ev));
-        fallbackBtn.__bound_click = true;
-      }
-    } catch (_) {}
+    // (Removido) binds de salvar/submit — responsabilidade do módulo funcionarios.js
 
     // NEW: Role Management button
     document.getElementById('btn-manage-roles').addEventListener('click', () => {

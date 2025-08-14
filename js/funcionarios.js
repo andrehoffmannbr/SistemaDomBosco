@@ -93,24 +93,7 @@ try {
 // ---- Delegation setup (runs immediately)
 debugLog('Setting up funcionarios delegation listeners');
 
-// Delegation for save button
-delegateClick('#btn-save-funcionario, [data-action="save-funcionario"]', (ev, btn) => {
-  ev.preventDefault();
-  debugLog('Delegation: save funcionario clicked via', btn.id || btn.getAttribute('data-action'));
-  try {
-    // prioridade a handler global; cai para o proxy; por fim tenta local
-    (
-      globalThis.addNewFuncionario
-      || window.addNewFuncionario
-      || globalThis.addNewFuncionarioProxy
-      || (typeof addNewFuncionarioProxy === 'function' && addNewFuncionarioProxy)
-      || addNewFuncionario
-    )?.(ev) || console.warn('[func] Nenhuma rotina de cadastro encontrada (addNewFuncionario/Proxy ausentes).');
-  } catch (e) {
-    console.error('[func] addNewFuncionario (delegation) error:', e);
-    try { showNotification('Não foi possível salvar o funcionário no momento.', 'error'); } catch {}
-  }
-});
+// (Removido) delegateClick do botão; evitamos disparo duplo.
 
 // Delegation for employee form submission
 delegateSubmit('form[data-form="funcionario"]', (ev, form) => {
@@ -1322,8 +1305,11 @@ export async function addNewFuncionario(ev) {
       return;
     }
 
-    // Coleta permissões via selects data-tabkey
-    const container = document.getElementById('func-permissions') || document;
+    // Coleta permissões via selects data-tabkey (scope correto do modal de add)
+    const container =
+      document.getElementById('permissoes-funcionario')
+      || document.getElementById('modal-add-funcionario')
+      || document;
     const tabAccess = collectTabAccess(container);
 
     // Reaproveita a função existente do projeto
@@ -1351,25 +1337,10 @@ if (!globalThis.addNewFuncionario) {
   globalThis.addNewFuncionario = addNewFuncionario;
 }
 
-// ===== Binds após DOM carregado (idempotentes) =====
-document.addEventListener('DOMContentLoaded', () => {
-  // salvar funcionário — botão
-  $bind('btn-save-funcionario', (e)=>window.addNewFuncionario?.(e), 'click');
-  
-  // salvar funcionário — submit do form (teclado/enter)
-  const form = document.querySelector('form[data-form="funcionario"]');
-  if (form && !form.__bound_submit) {
-    form.addEventListener('submit', (ev) => { ev.preventDefault(); window.addNewFuncionario?.(ev); });
-    form.__bound_submit = true;
-  }
-  try {
-    const btn = document.querySelector('[data-action="save-funcionario"]');
-    if (btn && !btn.__bound_click) {
-      btn.addEventListener('click', (ev) => addNewFuncionario(ev));
-      btn.__bound_click = true;
-    }
-  } catch (_) {}
-});
+// (Removido) bloco de binds redundantes em DOMContentLoaded.
+// Mantemos:
+//  - ensureSaveFuncionarioBinds() → bind direto no #btn-save-funcionario (idempotente)
+//  - delegateSubmit('form[data-form="funcionario"]', ...) → cobre Enter/submit
 
 // Removido bloco duplicado; fica apenas a delegação principal no topo.
 
