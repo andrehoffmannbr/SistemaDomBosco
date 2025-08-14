@@ -1034,44 +1034,63 @@ export async function addFuncionario() {
     // CHAMADA ÚNICA — sem fetch, sem URL hardcoded
     const { data, error } = await supabase.functions.invoke('create-user', { body: funcionarioData });
 
-    // --- Diagnóstico detalhado (lendo ReadableStream do SDK) ---
+    // Helper genérico para extrair texto de diferentes formas
+    async function readAsText(maybe) {
+      try {
+        if (!maybe) return '';
+        if (typeof maybe === 'string') return maybe;
+        // Response (tem .text())
+        if (typeof maybe?.text === 'function' && maybe?.clone) {
+          return await maybe.clone().text();
+        }
+        // ReadableStream (tem getReader) → embrulha em Response
+        const isReadableStream =
+          typeof maybe?.getReader === 'function' ||
+          (maybe?.constructor && maybe.constructor.name === 'ReadableStream');
+        if (isReadableStream) {
+          return await new Response(maybe).text();
+        }
+        // Objeto com .text() mesmo sem clone()
+        if (typeof maybe?.text === 'function') {
+          try { return await maybe.text(); } catch {}
+        }
+        // Último recurso
+        return typeof maybe === 'object' ? JSON.stringify(maybe) : String(maybe);
+      } catch {
+        return '';
+      }
+    }
+
+    // --- Diagnóstico detalhado (status + corpo do erro normalizado) ---
     const status =
       error?.context?.response?.status ??
       error?.context?.status ??
       null;
 
     let backend = '';
+    let rawText = '';
     // 1) às vezes a function devolve { ok:false, error } em "data"
     if (data && typeof data === 'object') {
       backend = data.error || data.message || '';
     }
-    // 2) quando é non-2xx, o SDK fornece um Response (ReadableStream) em error.context.response
+    // 2) tenta ler corpo do Response (quando disponível)
     if (!backend && error?.context?.response) {
+      rawText = await readAsText(error.context.response);
+    }
+    // 3) fallback: algumas versões colocam o corpo em error.context.body (pode ser ReadableStream)
+    if (!backend && !rawText && error?.context?.body) {
+      rawText = await readAsText(error.context.body);
+    }
+    // 4) parse do texto cru, se existir
+    if (!backend && rawText) {
       try {
-        const res = error.context.response.clone();
-        const text = await res.text();
-        backend = (() => {
-          try {
-            const j = JSON.parse(text);
-            return j?.error || j?.message || text;
-          } catch {
-            return text;
-          }
-        })();
+        const j = JSON.parse(rawText);
+        backend = j?.error || j?.message || rawText;
       } catch {
-        // ignora; ficará a msg padrão do SDK
+        backend = rawText;
       }
     }
-    // Fallback: algumas versões do SDK popularam "context.body" (string)
-    if (!backend && error?.context?.body) {
-      try {
-        const j = JSON.parse(error.context.body);
-        backend = j?.error || j?.message || String(error.context.body);
-      } catch {
-        backend = String(error.context.body);
-      }
-    }
-    // Último fallback: própria mensagem do erro
+    // 5) fallback final
     if (!backend && error?.message) {
       backend = error.message;
     }
@@ -1096,7 +1115,7 @@ export async function addFuncionario() {
         status,
         sdkMessage: error?.message,
         backendMessage: backend,
-        responseBodyText: backend || null,
+        responseBodyText: rawText || backend || null,
         responseStatus: error?.context?.response?.status ?? null,
         data,
       });
