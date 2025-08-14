@@ -124,7 +124,8 @@ import { formatDuration } from './utils.js'; // Import duration formatting utili
 // ===== Cadastro de Funcionário — coletores tolerantes =====
 const FUNC_FIELD_IDS = {
   name:    ['func-name', 'nome', 'employee-name'],
-  email:   ['func-email', 'email', 'employee-email'],
+  // inclui o id do campo do modal: new-funcionario-username
+  email:   ['func-email', 'email', 'employee-email', 'new-funcionario-username'],
   phone:   ['func-phone', 'telefone', 'employee-phone'],
   cpf:     ['func-cpf', 'cpf', 'employee-cpf'],
   role:    ['func-role', 'cargo', 'employee-role'],
@@ -166,6 +167,47 @@ function collectTabAccess(container) {
     out[key] = map[raw] ?? 'none';
   });
   return out;
+}
+
+// ---- Roles (cargos) helpers
+function getKnownRoles() {
+  // 1) Cargos padrão vindos das constantes (quando disponíveis)
+  const builtins = Array.isArray(PROFESSIONAL_ROLES)
+    ? PROFESSIONAL_ROLES.map(r => (typeof r === 'string' ? { name: r } : r))
+    : [];
+  // 2) Cargos cadastrados (db.roles) quando existirem
+  const custom = Array.isArray(db?.roles)
+    ? db.roles.map(r => ({ name: r.name || r.label || `${r}` }))
+    : [];
+  // 3) Dedup case-insensitive por nome
+  const seen = new Set();
+  const all = [...builtins, ...custom].filter(r => {
+    const k = (r.name || '').trim().toLowerCase();
+    if (!k || seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+  // Ordena alfabeticamente
+  return all.sort((a,b) => (a.name||'').localeCompare(b.name||''));
+}
+
+export function populateFuncionarioRoleSelect(selectId = 'func-role') {
+  try {
+    const sel = document.getElementById(selectId);
+    if (!sel) return;
+    const roles = getKnownRoles();
+    // Cabeçalho/placeholder
+    const opts = ['<option value="">Selecione um cargo (opcional)</option>']
+      .concat(roles.map(r => `<option value="${(r.name||'').trim()}">${(r.name||'').trim()}</option>`));
+    sel.innerHTML = opts.join('');
+  } catch (e) {
+    console.warn('[func] populateFuncionarioRoleSelect falhou:', e);
+  }
+}
+
+// Exporta para uso cross-module (idempotente)
+if (!globalThis.populateFuncionarioRoleSelect) {
+  globalThis.populateFuncionarioRoleSelect = populateFuncionarioRoleSelect;
 }
 
 // [B4] NEW: Centralized user profile functions
@@ -1273,6 +1315,12 @@ export function initRolesManagement() {
 
 // ===== addNewFuncionario — idempotente e tolerante =====
 export async function addNewFuncionario(ev) {
+  // anti-duplo clique
+  if (globalThis.__savingFuncionario) return;
+  globalThis.__savingFuncionario = true;
+  const btn = document.getElementById('btn-save-funcionario');
+  if (btn) btn.disabled = true;
+
   try {
     if (ev?.preventDefault) ev.preventDefault();
 
@@ -1329,6 +1377,9 @@ export async function addNewFuncionario(ev) {
   } catch (err) {
     console.error('addNewFuncionario error:', err);
     showNotification?.('Falha ao cadastrar funcionário. Veja o console para detalhes.', 'error');
+  } finally {
+    globalThis.__savingFuncionario = false;
+    if (btn) btn.disabled = false;
   }
 }
 

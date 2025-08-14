@@ -1,0 +1,21 @@
+/* === overrides: modal de novo funcionário === */
+#modal-add-funcionario select,
+#modal-add-funcionario select option {
+  background: #fff !important;
+  color: #111 !important;
+}
+
+#modal-add-funcionario select {
+  border: 1px solid var(--border-color, #d0d7de);
+  outline: none;
+  box-shadow: none;
+}
+
+/* melhora o contraste em temas escuros */
+@media (prefers-color-scheme: dark) {
+  #modal-add-funcionario select,
+  #modal-add-funcionario select option {
+    background: #fff !important;
+    color: #111 !important;
+  }
+}

@@ -1020,6 +1020,8 @@ function setupEventListeners() {
 
             // Garante que o botão SALVAR/submit já estejam ligados
             (globalThis.ensureSaveFuncionarioBinds || window.ensureSaveFuncionarioBinds)?.();
+            // Popula as opções de cargo do select do modal
+            (globalThis.populateFuncionarioRoleSelect || window.populateFuncionarioRoleSelect)?.('func-role');
         } catch (e) {
             console.error('[func] erro ao abrir modal de novo funcionário:', e);
         }

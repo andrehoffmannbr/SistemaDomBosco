@@ -4,6 +4,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>FUNDAÇÃO DOM BOSCO</title>
     <link rel="stylesheet" href="style.css">
+    <!-- overrides visuais carregados depois do style principal -->
+    <link rel="stylesheet" href="css/overrides.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
@@ -1698,7 +1700,7 @@
                     <div class="form-row">
                         <div class="form-group">
                             <label for="new-funcionario-username">Usuário</label>
-                            <input type="text" id="new-funcionario-username" required>
+                            <input type="email" id="new-funcionario-username" placeholder="email@dominio.com" autocomplete="username" required>
                         </div>
                         <div class="form-group">
                             <label for="func-password">Senha</label>
