@@ -1032,15 +1032,38 @@ export async function addFuncionario() {
     // CHAMADA ÚNICA — sem fetch, sem URL hardcoded
     const { data, error } = await supabase.functions.invoke('create-user', { body: funcionarioData });
 
+    // Normaliza resposta mesmo em erro (SDK popula `error` e muitas vezes também `data`)
+    const status = error?.context?.status ?? null;
+    // `data` pode vir string/objeto; tentamos extrair a mensagem do backend
+    let backend = '';
+    try {
+      if (data && typeof data === 'object') backend = data.error || data.message || '';
+      else if (typeof data === 'string') {
+        try { backend = JSON.parse(data).error || JSON.parse(data).message || ''; } catch {}
+      }
+    } catch {}
+
     if (error || !data?.ok) {
-      const raw = error?.message || data?.error || '';
-      const msg = /already|exist|email/i.test(raw)
-        ? 'E-mail já cadastrado. Use outro e-mail.'
-        : /cors|failed to fetch/i.test(raw)
-          ? 'Falha de comunicação com o servidor (CORS). Avise o administrador.'
-          : (raw || 'Erro ao criar funcionário. Tente novamente.');
-      console.error('[func] addFuncionario error:', raw);
-      showNotification(msg, 'error');
+      const raw = backend || error?.message || '';
+      let msg;
+      if (status === 409 || /already|exist|email/i.test(raw)) {
+        msg = 'E-mail já cadastrado. Use outro e-mail.';
+      } else if (/cors|failed to fetch/i.test(raw)) {
+        msg = 'Falha de comunicação com o servidor (CORS). Avise o administrador.';
+      } else if (/missing_fields|invalid_json/i.test(raw)) {
+        msg = 'Email, senha e nome são obrigatórios.';
+      } else if (status === 404) {
+        msg = 'Função não encontrada (create-user). Verifique o deploy e o nome.';
+      } else {
+        msg = raw || 'Erro ao criar funcionário. Tente novamente.';
+      }
+      console.error('[func] addFuncionario error →', {
+        status,
+        sdkMessage: error?.message,
+        backendMessage: backend,
+        data,
+      });
+      showNotification('Erro', msg, 'error');
       return;
     }
 
