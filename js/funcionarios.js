@@ -1000,6 +1000,14 @@ export function deleteFuncionario(funcionarioId) {
     updateGlobalSearchDatalist();
 }
 
+// —— Helpers de e-mail (sanitização + validação) ————————————————————————————
+function sanitizeEmail(v) {
+  return String(v || '').trim().toLowerCase();
+}
+function isValidEmail(v) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v || '').trim());
+}
+
 // (NOVA) Envia cadastro via SDK: supabase.functions.invoke
 export async function addFuncionario() {
   try {
@@ -1011,8 +1019,16 @@ export async function addFuncionario() {
     globalThis.__savingFuncionario = true;
     if (btn) setLoading(btn, true);
 
-    // coleta dos campos
-    const email = (document.getElementById('new-funcionario-username')?.value || '').trim();
+    // Coleta e-mail do input + sanitização + validação local
+    const emailInput = document.getElementById('new-funcionario-username');
+    const emailRaw   = emailInput?.value ?? '';
+    const email      = sanitizeEmail(emailRaw);
+    if (!isValidEmail(email)) {
+      showNotification('Atenção', 'Informe um e-mail válido (ex.: nome@dominio.com).', 'warning');
+      emailInput?.focus?.();
+      return;
+    }
+
     const password = (document.getElementById('func-password')?.value || '').trim();
     const name = (document.getElementById('func-name')?.value || '').trim();
     const role = (document.getElementById('func-role')?.value || '') || null; // opcional
@@ -1022,11 +1038,18 @@ export async function addFuncionario() {
       ? collectTabAccess(document.getElementById('permissoes-funcionario'))
       : {};
 
-    const funcionarioData = { email, password, name, role, tab_access };
+    // Monte o payload usando SEMPRE o e-mail sanitizado acima
+    const funcionarioData = {
+      email, // usar o sanitizado; remova qualquer leitura direta do DOM aqui
+      password,
+      name,
+      role,
+      tab_access
+    };
 
     // Guarda de campos obrigatórios no cliente — evita 400 sem corpo
-    if (!email || !password || !name) {
-      showNotification('Atenção', 'Email, senha e nome são obrigatórios.', 'warning');
+    if (!password || !name) {
+      showNotification('Atenção', 'Senha e nome são obrigatórios.', 'warning');
       console.warn('[func] bloqueado no cliente: campos obrigatórios ausentes', { email, hasPassword: !!password, hasName: !!name });
       return;
     }
@@ -1110,6 +1133,10 @@ export async function addFuncionario() {
       // Fallback explícito: alguns ambientes retornam 400 com a frase "already been registered"
       if (!userMessage && status === 400 && /already.*registered/i.test(rawText || backend || '')) {
         userMessage = 'E-mail já cadastrado. Use outro e-mail.';
+      }
+      // E-mail inválido reportado pelo Supabase Auth (fallback de servidor)
+      if (!userMessage && /unable to validate email address/i.test((backend || '') + ' ' + (rawText || ''))) {
+        userMessage = 'E-mail inválido. Verifique o formato (ex.: nome@dominio.com).';
       }
 
       const msg = userMessage || raw || 'Erro ao criar funcionário. Tente novamente.';
